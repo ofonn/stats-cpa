@@ -339,9 +339,6 @@ export default function App() {
   const [savingRevenue, setSavingRevenue] = useState(false);
   const [savedSuccessfully, setSavedSuccessfully] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showResetModal, setShowResetModal] = useState(false); // Custom "Glass" Modal for Reset
-  const [resetConfirmStep, setResetConfirmStep] = useState(0); // 0 = closed, 1 = first warning, 2 = final warning
-  const [historyToDelete, setHistoryToDelete] = useState(null); // State for deleting specific history
   const [collapsedSections, setCollapsedSections] = useState({
     pattern: true,
     milestones: true,
@@ -991,10 +988,14 @@ export default function App() {
   };
 
   const handleDeleteHistory = (date) => {
-    // Reuse the Reset Modal state but with a special flag or just use a new simple state
-    // To keep it clean, let's reuse the modal mechanism or add a specific one.
-    // For speed and consistency, let's use a new state: `historyToDelete`
-    setHistoryToDelete(date);
+    if (confirm(`Delete record for ${date}?`)) {
+      setHistory((prev) => {
+        const { [date]: _, ...rest } = prev;
+        localStorage.setItem("cpa:history", JSON.stringify(rest));
+        return rest;
+      });
+      setEditingRecord(null);
+    }
   };
 
   return (
@@ -1219,8 +1220,28 @@ export default function App() {
                   </p>
                   <button
                     onClick={() => {
-                      setShowSettings(false);
-                      setShowResetModal(true);
+                      if (
+                        confirm(
+                          "⚠️ FACTORY RESET WARNING ⚠️\n\nThis will PERMANENTLY DELETE all your checkpoints, history logs, and settings.\n\nAre you absolutely sure?"
+                        )
+                      ) {
+                        if (
+                          confirm(
+                            "Last Chance: This cannot be undone. Wipe everything?"
+                          )
+                        ) {
+                          localStorage.removeItem("cpa:history");
+                          localStorage.removeItem("cpa:config");
+                          localStorage.removeItem("cpa:checkpoints");
+                          Object.keys(localStorage).forEach((key) => {
+                            if (key.startsWith("cpa:")) {
+                              localStorage.removeItem(key);
+                            }
+                          });
+                          alert("System Wiped. Rebooting...");
+                          window.location.reload();
+                        }
+                      }
                     }}
                     className="w-full py-4 rounded-xl border border-red-500/20 bg-red-500/5 text-red-500 text-xs font-black uppercase tracking-widest hover:bg-red-500/10 transition-all"
                   >
@@ -1550,7 +1571,7 @@ export default function App() {
                   />
                   <div
                     ref={timelineRef}
-                    className="flex items-center relative overflow-x-auto scrollbar-hide gap-4 px-4 py-6 snap-x"
+                    className="flex items-center justify-between relative overflow-x-auto scrollbar-hide gap-3 px-1"
                   >
                     {SCHEDULE.map((s, i) => {
                       const slotNum = s.slot;
@@ -1561,69 +1582,72 @@ export default function App() {
                       return (
                         <div
                           key={slotNum}
-                          className={`flex flex-col items-center gap-3 flex-shrink-0 snap-center transition-all duration-300 group cursor-pointer ${
-                            isCurrent
-                              ? "scale-110 z-10"
-                              : "scale-95 opacity-50 hover:opacity-100 hover:scale-100"
+                          className={`flex flex-col items-center gap-1.5 flex-shrink-0 relative ${
+                            isCurrent ? "current-slot-node" : ""
                           }`}
-                          onClick={() => {
-                            togglePosted(slotNum);
-                            // Also show tooltip for a moment as feedback
-                            setTimelineTooltip(slotNum);
-                            setTimeout(() => setTimelineTooltip(null), 1500);
-                          }}
+                          onMouseEnter={() => setTimelineTooltip(slotNum)}
+                          onMouseLeave={() => setTimelineTooltip(null)}
+                          onClick={() =>
+                            setTimelineTooltip(
+                              timelineTooltip === slotNum ? null : slotNum
+                            )
+                          }
                         >
-                          {/* LARGE CARD INDICATOR */}
                           <div
-                            className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center border-2 transition-all duration-500 relative shadow-xl ${
+                            className={`w-2.5 h-2.5 rounded-full border transition-all duration-500 ${
                               isCurrent
-                                ? "bg-cyan-500/20 border-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.4)] ring-4 ring-cyan-500/10"
+                                ? "bg-cyan-400 border-cyan-400 neon-glow-cyan"
                                 : isPosted
-                                ? "bg-emerald-500/20 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                                ? "bg-emerald-500 border-emerald-500"
                                 : isPast
-                                ? "bg-red-500/10 border-red-500/20"
-                                : "bg-white/5 border-white/10 hover:border-white/30"
+                                ? "bg-red-500/20 border-red-500/40"
+                                : ""
                             }`}
+                            style={{
+                              backgroundColor:
+                                isPast || isCurrent ? "" : "var(--card-bg)",
+                              borderColor:
+                                isPast || isCurrent ? "" : "var(--card-border)",
+                            }}
                           >
-                            {/* Content */}
-                            <div
-                              className={`text-lg font-black italic select-none ${
-                                isCurrent
-                                  ? "text-cyan-400"
-                                  : isPosted
-                                  ? "text-emerald-400"
-                                  : "text-[var(--text-dim)]"
-                              }`}
-                            >
-                              {slotNum}
-                            </div>
                             {isPosted && (
-                              <div className="absolute -top-2 -right-2 bg-emerald-500 text-[#020617] rounded-full p-1 border-2 border-[#020617] shadow-lg animate-in zoom-in duration-300">
-                                <Check size={10} strokeWidth={4} />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-[6px] text-white">✓</span>
                               </div>
-                            )}
-                            {isCurrent && (
-                              <div className="absolute inset-0 rounded-2xl animate-pulse bg-cyan-400/5 pointer-events-none" />
                             )}
                           </div>
 
-                          {/* LABELS */}
-                          <div className="flex flex-col items-center select-none">
-                            <span
-                              className="text-[10px] font-black uppercase tracking-widest"
-                              style={{ color: "var(--text-dim)" }}
-                            >
-                              {s.time}
-                            </span>
-                            {isCurrent && (
-                              <div className="flex items-center gap-1.5 mt-1">
-                                <div className="w-1 h-1 rounded-full bg-cyan-400 animate-ping" />
-                                <span className="text-[9px] font-black text-cyan-400 tracking-tighter">
-                                  ACTIVE
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                          {/* TOOLTIP */}
+                          {timelineTooltip === slotNum && (
+                            <div className="absolute bottom-full mb-3 bg-[#020617] backdrop-blur-2xl border border-white/20 rounded-2xl px-4 py-3 whitespace-nowrap z-50 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+                              <p className="text-xs font-black text-cyan-400 mb-1">
+                                {s.time}
+                              </p>
+                              <p
+                                className="text-xs font-black uppercase tracking-widest"
+                                style={{ color: "var(--text-primary)" }}
+                              >
+                                {s.geo}
+                              </p>
+                              <p
+                                className="text-[11px] font-bold uppercase tracking-tighter mt-1"
+                                style={{ color: "var(--text-dim)" }}
+                              >
+                                {s.expectation}
+                              </p>
+                            </div>
+                          )}
+
+                          <span
+                            style={{
+                              color: isCurrent ? "" : "var(--text-dim)",
+                            }}
+                            className={`text-[9px] font-black ${
+                              isCurrent ? "text-cyan-400" : ""
+                            }`}
+                          >
+                            {slotNum}
+                          </span>
                         </div>
                       );
                     })}
