@@ -1459,29 +1459,28 @@ export default function App() {
 
               {/* 3. PREMIUM SLOT TIMELINE */}
               <div className="glass-card rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-400">
-                    Tactical Timeline
-                  </span>
-                  <div className="flex gap-2">
-                    <span
-                      className="text-xs font-black"
-                      style={{ color: "var(--text-dim)" }}
-                    >
-                      P: {postedSlots.length}
+                <div className="flex gap-4">
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400">
+                      Posted
                     </span>
-                    <span
-                      className="text-xs font-black"
-                      style={{ color: "var(--text-dim)" }}
-                    >
-                      S: {slotsCompleted - postedSlots.length}
+                    <span className="text-xl font-black italic text-white leading-none">
+                      {postedSlots.length}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-black uppercase tracking-widest text-red-400">
+                      Deviated
+                    </span>
+                    <span className="text-xl font-black italic text-white leading-none">
+                      {slotsCompleted - postedSlots.length}
                     </span>
                   </div>
                 </div>
 
                 <div className="relative pt-2">
                   <div
-                    className="absolute top-[17px] left-0 right-0 h-0.5"
+                    className="absolute top-[32px] left-0 right-0 h-0.5 shadow-[0_0_10px_rgba(255,255,255,0.05)]"
                     style={{ backgroundColor: "var(--card-border)" }}
                   />
                   <div
@@ -1510,13 +1509,13 @@ export default function App() {
                         >
                           {/* CIRCLE INDICATOR */}
                           <div
-                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-500 relative ${
+                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all duration-500 relative ${
                               isCurrent
-                                ? "bg-cyan-400 border-cyan-400 neon-glow-cyan shadow-[0_0_20px_rgba(6,182,212,0.6)]"
+                                ? "bg-cyan-400 border-cyan-400 neon-glow-cyan shadow-[0_0_25px_rgba(6,182,212,0.5)] scale-110"
                                 : isPosted
-                                ? "bg-emerald-500 border-emerald-500"
+                                ? "bg-emerald-500 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                                 : isPast
-                                ? "bg-red-500/20 border-red-500/40"
+                                ? "bg-red-500/30 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
                                 : "hover:border-white/40"
                             }`}
                             style={{
@@ -1531,7 +1530,7 @@ export default function App() {
                             }}
                           >
                             {isPosted && (
-                              <span className="text-[10px] text-white">✓</span>
+                              <span className="text-xs text-white">✓</span>
                             )}
                             {isCurrent && (
                               <div className="absolute inset-0 rounded-full animate-ping bg-cyan-400/30" />
@@ -2435,6 +2434,59 @@ export default function App() {
             </span>
           </button>
         </nav>
+
+        {/* FACTORY RESET MODAL (GLASS STYLE) */}
+        {showResetModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 transition-all duration-300">
+            <div
+              className="absolute inset-0 bg-[#020617]/90 backdrop-blur-xl animate-in fade-in duration-300"
+              onClick={() => setShowResetModal(false)}
+            />
+            <div className="relative w-full max-w-sm glass-card rounded-[2.5rem] p-8 text-center animate-in zoom-in-95 duration-300 shadow-[0_0_50px_rgba(239,68,68,0.3)] border-red-500/30">
+              <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-6 ring-1 ring-red-500/30">
+                <AlertTriangle
+                  size={32}
+                  className="text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+                />
+              </div>
+
+              <div className="mb-8 space-y-3">
+                <h3 className="text-xl font-black uppercase italic tracking-tighter text-white">
+                  Atomic Reset
+                </h3>
+                <p className="text-sm font-medium text-white/60 leading-relaxed px-2">
+                  This will wipe all local data, checkpoints, and history. This
+                  action is irreversible.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("cpa:history");
+                    localStorage.removeItem("cpa:config");
+                    localStorage.removeItem("cpa:checkpoints");
+                    Object.keys(localStorage).forEach((key) => {
+                      if (key.startsWith("cpa:")) {
+                        localStorage.removeItem(key);
+                      }
+                    });
+                    window.location.reload();
+                  }}
+                  className="w-full py-4 rounded-xl bg-red-500 text-white font-black uppercase tracking-[0.2em] text-xs shadow-lg shadow-red-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  Execute Wipe
+                </button>
+                <button
+                  onClick={() => setShowResetModal(false)}
+                  className="w-full py-4 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 font-black uppercase tracking-widest text-xs transition-colors"
+                >
+                  Abort Mission
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
