@@ -1627,75 +1627,112 @@ export default function App() {
 
               {/* 6. Compact Tactical Alert (Dismissible) */}
               {/* 6. NEXT SECTOR CARD (Replaces Red Alert) */}
-              <div className="glass-card rounded-2xl p-5 relative overflow-hidden">
-                <div
-                  className="absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 blur-2xl transition-colors"
-                  style={{ backgroundColor: "var(--card-bg)", opacity: 0.1 }}
-                />
-                <div className="flex items-center justify-between relative z-10">
-                  <div className="space-y-1">
-                    <p
-                      className="text-[9px] font-black uppercase tracking-widest"
-                      style={{ color: "var(--text-dim)" }}
-                    >
-                      Next Mission Sector
-                    </p>
-                    {(() => {
-                      const nextSlot =
-                        SCHEDULE.find((s) => s.slot === slotsCompleted + 1) ||
-                        SCHEDULE[0];
-                      return (
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="text-lg font-black italic tracking-tighter"
-                            style={{ color: "var(--text-primary)" }}
-                          >
-                            {nextSlot.time}
-                          </span>
-                          <span className="text-xs font-black text-cyan-400">
-                            {nextSlot.emoji}
-                          </span>
-                        </div>
-                      );
-                    })()}
-                  </div>
+              {/* 6. NEXT SECTOR CARD (Replaces Red Alert) */}
+              {(() => {
+                const nextSlot =
+                  SCHEDULE.find((s) => s.slot === slotsCompleted + 1) ||
+                  SCHEDULE[0];
+                const priorityColor =
+                  nextSlot.priority === "RED"
+                    ? "rgba(239, 68, 68, 0.15)" // Red
+                    : nextSlot.priority === "BLUE"
+                    ? "rgba(6, 182, 212, 0.15)" // Cyan
+                    : nextSlot.priority === "GREEN"
+                    ? "rgba(16, 185, 129, 0.15)" // Emerald
+                    : "rgba(245, 158, 11, 0.15)"; // Amber (Yellow)
 
-                  <div className="flex items-center gap-3">
-                    {/* ALARM TOGGLE */}
-                    {(() => {
-                      const nextSlotNum = slotsCompleted + 1;
-                      const isAlarmSet = enabledAlarms.includes(nextSlotNum);
-                      return (
-                        <button
-                          onClick={() => {
-                            setEnabledAlarms((prev) => {
-                              const next = prev.includes(nextSlotNum)
-                                ? prev.filter((s) => s !== nextSlotNum)
-                                : [...prev, nextSlotNum];
-                              localStorage.setItem(
-                                "cpa:enabledAlarms",
-                                JSON.stringify(next)
-                              );
-                              return next;
-                            });
-                          }}
-                          className={`p-3 rounded-full transition-all ${
-                            isAlarmSet
-                              ? "bg-cyan-500 text-[#020617] shadow-[0_0_20px_rgba(6,182,212,0.4)] animate-pulse"
-                              : "bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-dim)]"
-                          }`}
+                const borderColor =
+                  nextSlot.priority === "RED"
+                    ? "rgba(239, 68, 68, 0.3)"
+                    : nextSlot.priority === "BLUE"
+                    ? "rgba(6, 182, 212, 0.3)"
+                    : nextSlot.priority === "GREEN"
+                    ? "rgba(16, 185, 129, 0.3)"
+                    : "rgba(245, 158, 11, 0.3)";
+
+                return (
+                  <div
+                    className="glass-card rounded-2xl p-5 relative overflow-hidden transition-all duration-500"
+                    style={{
+                      backgroundColor: priorityColor,
+                      borderColor: borderColor,
+                      boxShadow: `0 0 30px ${priorityColor}`,
+                    }}
+                  >
+                    <div
+                      className="absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 blur-2xl transition-colors"
+                      style={{ backgroundColor: borderColor, opacity: 0.2 }}
+                    />
+                    <div className="flex items-center justify-between relative z-10">
+                      <div className="space-y-1">
+                        <p
+                          className="text-[9px] font-black uppercase tracking-widest"
+                          style={{ color: "var(--text-dim)" }}
                         >
-                          {isAlarmSet ? (
-                            <Bell size={18} />
-                          ) : (
-                            <BellOff size={18} />
-                          )}
-                        </button>
-                      );
-                    })()}
+                          Next Mission Sector
+                        </p>
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span
+                              className="text-2xl font-black italic tracking-tighter"
+                              style={{ color: "var(--text-primary)" }}
+                            >
+                              {nextSlot.time}
+                            </span>
+                            <span className="text-sm font-black text-cyan-400">
+                              {nextSlot.emoji}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-[#020617] bg-white/80 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                              {nextSlot.geo}
+                            </span>
+                            <span className="text-[10px] font-bold italic text-white/60">
+                              {nextSlot.expectation}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        {/* ALARM TOGGLE */}
+                        {(() => {
+                          const nextSlotNum = slotsCompleted + 1;
+                          const isAlarmSet =
+                            enabledAlarms.includes(nextSlotNum);
+                          return (
+                            <button
+                              onClick={() => {
+                                setEnabledAlarms((prev) => {
+                                  const next = prev.includes(nextSlotNum)
+                                    ? prev.filter((s) => s !== nextSlotNum)
+                                    : [...prev, nextSlotNum];
+                                  localStorage.setItem(
+                                    "cpa:enabledAlarms",
+                                    JSON.stringify(next)
+                                  );
+                                  return next;
+                                });
+                              }}
+                              className={`p-3 rounded-full transition-all ${
+                                isAlarmSet
+                                  ? "bg-white text-[#020617] shadow-lg scale-110"
+                                  : "bg-black/20 border border-white/10 text-white/50"
+                              }`}
+                            >
+                              {isAlarmSet ? (
+                                <Bell size={20} className="fill-current" />
+                              ) : (
+                                <BellOff size={20} />
+                              )}
+                            </button>
+                          );
+                        })()}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           )}
 
@@ -2349,17 +2386,17 @@ export default function App() {
             onClick={() => setView("schedule")}
             className={`flex flex-col items-center gap-1 px-4 py-2 rounded-full transition-all duration-500 flex-1 ${
               view === "schedule"
-                ? "bg-emerald-500/20 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.1)]"
+                ? "bg-cyan-500/20 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.1)]"
                 : "hover:text-cyan-400"
             }`}
             style={{ color: view === "schedule" ? "" : "var(--text-dim)" }}
           >
-            <Calendar
+            <Clock
               size={16}
-              className={view === "schedule" ? "animate-pulse" : ""}
+              className={view === "schedule" ? "animate-spin-slow" : ""}
             />
             <span className="text-[9px] font-black uppercase tracking-widest">
-              Array
+              Alarms
             </span>
           </button>
         </nav>
