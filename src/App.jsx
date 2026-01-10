@@ -655,8 +655,6 @@ export default function App() {
   }, []);
 
   // Mobile Alarm System (Sound + Notification)
-  // Auto-Focus Logic for Timeline
-  const [timelineRef] = useState({ current: null }); // Use Callback ref in real app, but ref object works if attached
   useEffect(() => {
     if (timelineRef.current) {
       const activeNode =
@@ -901,8 +899,6 @@ export default function App() {
         .sort((a, b) => a.date.localeCompare(b.date));
 
       const exportData = {
-        app: "CPA Tracker",
-        exportDate: new Date().toISOString(),
         history: flatHistory,
         raw: history,
       };
