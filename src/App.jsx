@@ -1487,7 +1487,7 @@ export default function App() {
                   />
                   <div
                     ref={timelineRef}
-                    className="flex items-center justify-between relative overflow-x-auto scrollbar-hide gap-4 px-2 py-4 snap-x"
+                    className="flex items-center relative overflow-x-auto scrollbar-hide gap-4 px-4 py-6 snap-x"
                   >
                     {SCHEDULE.map((s, i) => {
                       const slotNum = s.slot;
@@ -1498,63 +1498,58 @@ export default function App() {
                       return (
                         <div
                           key={slotNum}
-                          className={`flex flex-col items-center gap-2 flex-shrink-0 relative snap-center group ${
+                          className={`flex flex-col items-center gap-3 flex-shrink-0 snap-center transition-all duration-300 group cursor-pointer ${
                             isCurrent
-                              ? "current-slot-node scale-110"
-                              : "opacity-60 hover:opacity-100"
-                          } transition-all duration-300`}
+                              ? "scale-110 z-10"
+                              : "scale-95 opacity-50 hover:opacity-100 hover:scale-100"
+                          }`}
                           onClick={() =>
                             setTimelineTooltip(
                               timelineTooltip === slotNum ? null : slotNum
                             )
                           }
                         >
-                          {/* CIRCLE INDICATOR */}
+                          {/* LARGE CARD INDICATOR */}
                           <div
-                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-500 relative ${
+                            className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center border-2 transition-all duration-300 relative shadow-xl ${
                               isCurrent
-                                ? "bg-cyan-400 border-cyan-400 neon-glow-cyan shadow-[0_0_20px_rgba(6,182,212,0.6)]"
+                                ? "bg-cyan-500/20 border-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.4)]"
                                 : isPosted
-                                ? "bg-emerald-500 border-emerald-500"
+                                ? "bg-emerald-500/20 border-emerald-500"
                                 : isPast
-                                ? "bg-red-500/20 border-red-500/40"
-                                : "hover:border-white/40"
+                                ? "bg-red-500/10 border-red-500/20"
+                                : "bg-white/5 border-white/10 hover:border-white/30"
                             }`}
-                            style={{
-                              backgroundColor:
-                                isPast || isCurrent || isPosted
-                                  ? ""
-                                  : "var(--card-bg)",
-                              borderColor:
-                                isPast || isCurrent || isPosted
-                                  ? ""
-                                  : "var(--card-border)",
-                            }}
                           >
+                            {/* Content */}
+                            <span
+                              className={`text-lg font-black italic ${
+                                isCurrent
+                                  ? "text-cyan-400"
+                                  : isPosted
+                                  ? "text-emerald-400"
+                                  : "text-[var(--text-dim)]"
+                              }`}
+                            >
+                              {slotNum}
+                            </span>
                             {isPosted && (
-                              <span className="text-[10px] text-white">✓</span>
-                            )}
-                            {isCurrent && (
-                              <div className="absolute inset-0 rounded-full animate-ping bg-cyan-400/30" />
+                              <div className="absolute -top-2 -right-2 bg-emerald-500 text-[#020617] rounded-full p-0.5 border-2 border-[#020617]">
+                                <Check size={10} strokeWidth={4} />
+                              </div>
                             )}
                           </div>
 
                           {/* LABELS */}
                           <div className="flex flex-col items-center">
                             <span
-                              className={`text-[10px] font-black uppercase tracking-widest ${
-                                isCurrent ? "text-cyan-400" : ""
-                              }`}
-                              style={{
-                                color: isCurrent ? "" : "var(--text-dim)",
-                              }}
+                              className="text-[10px] font-black uppercase tracking-widest"
+                              style={{ color: "var(--text-dim)" }}
                             >
-                              {/* Slot X - More Descriptive */}
-                              SLOT {slotNum}
+                              {s.time}
                             </span>
-
                             {isCurrent && (
-                              <span className="text-[9px] font-bold text-cyan-400/80 mt-0.5">
+                              <span className="text-[9px] font-black text-cyan-400 animate-pulse mt-1">
                                 ACTIVE
                               </span>
                             )}
