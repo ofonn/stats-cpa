@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.ofonn.twa",
+      "sha256_cert_fingerprints": [
+        "AE:F6:B7:5F:EE:F6:67:5A:EC:A0:24:3C:07:70:C0:0C:81:8E:2D:44:C7:DC:0C:02:E1:D0:17:04:A3:06:AA:79"
+      ]
+    }
+  }
+]
