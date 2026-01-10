@@ -24,4 +24,5 @@ sas.png
 CPA Tracker - Google Play package (1)/
 collage/
 fix_icons.py
-# sas.png is already handled above
+root-deploy/
+*.png
