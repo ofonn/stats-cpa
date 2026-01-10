@@ -1684,10 +1684,20 @@ export default function App() {
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-[#020617] bg-white/80 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                            <span
+                              className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full backdrop-blur-sm shadow-sm"
+                              style={{
+                                backgroundColor: "var(--card-bg)",
+                                color: "var(--text-primary)",
+                                border: "1px solid var(--card-border)",
+                              }}
+                            >
                               {nextSlot.geo}
                             </span>
-                            <span className="text-[10px] font-bold italic text-white/60">
+                            <span
+                              className="text-[10px] font-bold italic"
+                              style={{ color: "var(--text-dim)" }}
+                            >
                               {nextSlot.expectation}
                             </span>
                           </div>
