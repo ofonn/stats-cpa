@@ -341,6 +341,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false); // Custom "Glass" Modal for Reset
   const [resetConfirmStep, setResetConfirmStep] = useState(0); // 0 = closed, 1 = first warning, 2 = final warning
+  const [historyToDelete, setHistoryToDelete] = useState(null); // State for deleting specific history
   const [collapsedSections, setCollapsedSections] = useState({
     pattern: true,
     milestones: true,
@@ -668,7 +669,7 @@ export default function App() {
         });
       }
     }
-  }, [slotsCompleted, timelineRef]);
+  }, [slotsCompleted]);
 
   useEffect(() => {
     const checkAlarms = () => {
@@ -994,14 +995,10 @@ export default function App() {
   };
 
   const handleDeleteHistory = (date) => {
-    if (confirm(`Delete record for ${date}?`)) {
-      setHistory((prev) => {
-        const { [date]: _, ...rest } = prev;
-        localStorage.setItem("cpa:history", JSON.stringify(rest));
-        return rest;
-      });
-      setEditingRecord(null);
-    }
+    // Reuse the Reset Modal state but with a special flag or just use a new simple state
+    // To keep it clean, let's reuse the modal mechanism or add a specific one.
+    // For speed and consistency, let's use a new state: `historyToDelete`
+    setHistoryToDelete(date);
   };
 
   return (
@@ -1233,6 +1230,26 @@ export default function App() {
                   >
                     Reset All Data
                   </button>
+
+                  <button
+                    onClick={() => {
+                      if ("serviceWorker" in navigator) {
+                        navigator.serviceWorker
+                          .getRegistrations()
+                          .then((registrations) => {
+                            for (let registration of registrations) {
+                              registration.unregister();
+                            }
+                            window.location.reload(true);
+                          });
+                      } else {
+                        window.location.reload(true);
+                      }
+                    }}
+                    className="w-full py-3 rounded-xl border border-cyan-500/20 bg-cyan-500/5 text-cyan-400 text-[10px] font-black uppercase tracking-widest hover:bg-cyan-500/10 transition-all mt-4"
+                  >
+                    Force App Update
+                  </button>
                 </div>
               </div>
             </div>
@@ -1458,6 +1475,56 @@ export default function App() {
                 )}
               </div>
 
+              {/* HISTORY DELETE MODAL */}
+              {historyToDelete && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 transition-all duration-300">
+                  <div
+                    className="absolute inset-0 bg-[#020617]/90 backdrop-blur-xl animate-in fade-in duration-300"
+                    onClick={() => setHistoryToDelete(null)}
+                  />
+                  <div className="relative w-full max-w-sm glass-card rounded-[2.5rem] p-8 text-center animate-in zoom-in-95 duration-300 shadow-[0_0_50px_rgba(239,68,68,0.3)] border-red-500/30">
+                    <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-6 ring-1 ring-red-500/30">
+                      <Trash2
+                        size={32}
+                        className="text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+                      />
+                    </div>
+                    <h3 className="text-xl font-black uppercase italic tracking-tighter text-white mb-2">
+                      Purge Record?
+                    </h3>
+                    <p className="text-xs font-black uppercase tracking-widest text-cyan-400 mb-6">
+                      {new Date(historyToDelete).toLocaleDateString()}
+                    </p>
+
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={() => {
+                          setHistory((prev) => {
+                            const { [historyToDelete]: _, ...rest } = prev;
+                            localStorage.setItem(
+                              "cpa:history",
+                              JSON.stringify(rest)
+                            );
+                            return rest;
+                          });
+                          setHistoryToDelete(null);
+                          setEditingRecord(null);
+                        }}
+                        className="w-full py-4 rounded-xl bg-red-500 text-white font-black uppercase tracking-[0.2em] text-xs shadow-lg shadow-red-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      >
+                        Execute Delete
+                      </button>
+                      <button
+                        onClick={() => setHistoryToDelete(null)}
+                        className="w-full py-4 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 font-black uppercase tracking-widest text-xs transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* 3. PREMIUM SLOT TIMELINE */}
               <div className="glass-card rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -1503,27 +1570,28 @@ export default function App() {
                               ? "scale-110 z-10"
                               : "scale-95 opacity-50 hover:opacity-100 hover:scale-100"
                           }`}
-                          onClick={() =>
-                            setTimelineTooltip(
-                              timelineTooltip === slotNum ? null : slotNum
-                            )
-                          }
+                          onClick={() => {
+                            togglePosted(slotNum);
+                            // Also show tooltip for a moment as feedback
+                            setTimelineTooltip(slotNum);
+                            setTimeout(() => setTimelineTooltip(null), 1500);
+                          }}
                         >
                           {/* LARGE CARD INDICATOR */}
                           <div
-                            className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center border-2 transition-all duration-300 relative shadow-xl ${
+                            className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center border-2 transition-all duration-500 relative shadow-xl ${
                               isCurrent
-                                ? "bg-cyan-500/20 border-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.4)]"
+                                ? "bg-cyan-500/20 border-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.4)] ring-4 ring-cyan-500/10"
                                 : isPosted
-                                ? "bg-emerald-500/20 border-emerald-500"
+                                ? "bg-emerald-500/20 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]"
                                 : isPast
                                 ? "bg-red-500/10 border-red-500/20"
                                 : "bg-white/5 border-white/10 hover:border-white/30"
                             }`}
                           >
                             {/* Content */}
-                            <span
-                              className={`text-lg font-black italic ${
+                            <div
+                              className={`text-lg font-black italic select-none ${
                                 isCurrent
                                   ? "text-cyan-400"
                                   : isPosted
@@ -1532,16 +1600,19 @@ export default function App() {
                               }`}
                             >
                               {slotNum}
-                            </span>
+                            </div>
                             {isPosted && (
-                              <div className="absolute -top-2 -right-2 bg-emerald-500 text-[#020617] rounded-full p-0.5 border-2 border-[#020617]">
+                              <div className="absolute -top-2 -right-2 bg-emerald-500 text-[#020617] rounded-full p-1 border-2 border-[#020617] shadow-lg animate-in zoom-in duration-300">
                                 <Check size={10} strokeWidth={4} />
                               </div>
+                            )}
+                            {isCurrent && (
+                              <div className="absolute inset-0 rounded-2xl animate-pulse bg-cyan-400/5 pointer-events-none" />
                             )}
                           </div>
 
                           {/* LABELS */}
-                          <div className="flex flex-col items-center">
+                          <div className="flex flex-col items-center select-none">
                             <span
                               className="text-[10px] font-black uppercase tracking-widest"
                               style={{ color: "var(--text-dim)" }}
@@ -1549,9 +1620,12 @@ export default function App() {
                               {s.time}
                             </span>
                             {isCurrent && (
-                              <span className="text-[9px] font-black text-cyan-400 animate-pulse mt-1">
-                                ACTIVE
-                              </span>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <div className="w-1 h-1 rounded-full bg-cyan-400 animate-ping" />
+                                <span className="text-[9px] font-black text-cyan-400 tracking-tighter">
+                                  ACTIVE
+                                </span>
+                              </div>
                             )}
                           </div>
                         </div>
