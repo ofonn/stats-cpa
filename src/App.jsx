@@ -1197,6 +1197,45 @@ export default function App() {
                     />
                   </label>
                 </div>
+
+                {/* DANGER ZONE */}
+                <div
+                  className="pt-4 border-t"
+                  style={{ borderColor: "var(--card-border)" }}
+                >
+                  <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-2">
+                    Danger Zone
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (
+                        confirm(
+                          "⚠️ FACTORY RESET WARNING ⚠️\n\nThis will PERMANENTLY DELETE all your checkpoints, history logs, and settings.\n\nAre you absolutely sure?"
+                        )
+                      ) {
+                        if (
+                          confirm(
+                            "Last Chance: This cannot be undone. Wipe everything?"
+                          )
+                        ) {
+                          localStorage.removeItem("cpa:history");
+                          localStorage.removeItem("cpa:config");
+                          localStorage.removeItem("cpa:checkpoints");
+                          Object.keys(localStorage).forEach((key) => {
+                            if (key.startsWith("cpa:")) {
+                              localStorage.removeItem(key);
+                            }
+                          });
+                          alert("System Wiped. Rebooting...");
+                          window.location.reload();
+                        }
+                      }
+                    }}
+                    className="w-full py-4 rounded-xl border border-red-500/20 bg-red-500/5 text-red-500 text-xs font-black uppercase tracking-widest hover:bg-red-500/10 transition-all"
+                  >
+                    Reset All Data
+                  </button>
+                </div>
               </div>
             </div>
           </div>
