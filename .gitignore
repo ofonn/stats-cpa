@@ -18,3 +18,11 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# User Artifacts & APK Build
+sas.png
+CPA Tracker - Google Play package (1)/
+collage/
+fix_icons.py
+root-deploy/
+*.png

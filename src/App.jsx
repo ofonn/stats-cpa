@@ -339,6 +339,8 @@ export default function App() {
   const [savingRevenue, setSavingRevenue] = useState(false);
   const [savedSuccessfully, setSavedSuccessfully] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false); // Custom "Glass" Modal for Reset
+  const [resetConfirmStep, setResetConfirmStep] = useState(0); // 0 = closed, 1 = first warning, 2 = final warning
   const [collapsedSections, setCollapsedSections] = useState({
     pattern: true,
     milestones: true,
@@ -652,6 +654,22 @@ export default function App() {
   }, []);
 
   // Mobile Alarm System (Sound + Notification)
+  // Auto-Focus Logic for Timeline
+  const [timelineRef] = useState({ current: null }); // Use Callback ref in real app, but ref object works if attached
+  useEffect(() => {
+    if (timelineRef.current) {
+      const activeNode =
+        timelineRef.current.querySelector(".current-slot-node");
+      if (activeNode) {
+        activeNode.scrollIntoView({
+          behavior: "smooth",
+          inline: "center",
+          block: "nearest",
+        });
+      }
+    }
+  }, [slotsCompleted, timelineRef]);
+
   useEffect(() => {
     const checkAlarms = () => {
       const now = new Date();
@@ -1208,28 +1226,8 @@ export default function App() {
                   </p>
                   <button
                     onClick={() => {
-                      if (
-                        confirm(
-                          "⚠️ FACTORY RESET WARNING ⚠️\n\nThis will PERMANENTLY DELETE all your checkpoints, history logs, and settings.\n\nAre you absolutely sure?"
-                        )
-                      ) {
-                        if (
-                          confirm(
-                            "Last Chance: This cannot be undone. Wipe everything?"
-                          )
-                        ) {
-                          localStorage.removeItem("cpa:history");
-                          localStorage.removeItem("cpa:config");
-                          localStorage.removeItem("cpa:checkpoints");
-                          Object.keys(localStorage).forEach((key) => {
-                            if (key.startsWith("cpa:")) {
-                              localStorage.removeItem(key);
-                            }
-                          });
-                          alert("System Wiped. Rebooting...");
-                          window.location.reload();
-                        }
-                      }
+                      setShowSettings(false);
+                      setShowResetModal(true);
                     }}
                     className="w-full py-4 rounded-xl border border-red-500/20 bg-red-500/5 text-red-500 text-xs font-black uppercase tracking-widest hover:bg-red-500/10 transition-all"
                   >
@@ -1422,13 +1420,7 @@ export default function App() {
                       <span>Logging...</span>
                     </>
                   ) : savedSuccessfully ? (
-                    <>
-                      <CheckCircle
-                        size={16}
-                        className="animate-in zoom-in duration-200"
-                      />
-                      <span>Logged ✓</span>
-                    </>
+                    <span className="flex items-center gap-2">✅ Saved</span>
                   ) : (
                     <>
                       <TrendingUp
@@ -1495,7 +1487,7 @@ export default function App() {
                   />
                   <div
                     ref={timelineRef}
-                    className="flex items-center justify-between relative overflow-x-auto scrollbar-hide gap-3 px-1"
+                    className="flex items-center justify-between relative overflow-x-auto scrollbar-hide gap-4 px-2 py-4 snap-x"
                   >
                     {SCHEDULE.map((s, i) => {
                       const slotNum = s.slot;
@@ -1506,72 +1498,67 @@ export default function App() {
                       return (
                         <div
                           key={slotNum}
-                          className={`flex flex-col items-center gap-1.5 flex-shrink-0 relative ${
-                            isCurrent ? "current-slot-node" : ""
-                          }`}
-                          onMouseEnter={() => setTimelineTooltip(slotNum)}
-                          onMouseLeave={() => setTimelineTooltip(null)}
+                          className={`flex flex-col items-center gap-2 flex-shrink-0 relative snap-center group ${
+                            isCurrent
+                              ? "current-slot-node scale-110"
+                              : "opacity-60 hover:opacity-100"
+                          } transition-all duration-300`}
                           onClick={() =>
                             setTimelineTooltip(
                               timelineTooltip === slotNum ? null : slotNum
                             )
                           }
                         >
+                          {/* CIRCLE INDICATOR */}
                           <div
-                            className={`w-2.5 h-2.5 rounded-full border transition-all duration-500 ${
+                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-500 relative ${
                               isCurrent
-                                ? "bg-cyan-400 border-cyan-400 neon-glow-cyan"
+                                ? "bg-cyan-400 border-cyan-400 neon-glow-cyan shadow-[0_0_20px_rgba(6,182,212,0.6)]"
                                 : isPosted
                                 ? "bg-emerald-500 border-emerald-500"
                                 : isPast
                                 ? "bg-red-500/20 border-red-500/40"
-                                : ""
+                                : "hover:border-white/40"
                             }`}
                             style={{
                               backgroundColor:
-                                isPast || isCurrent ? "" : "var(--card-bg)",
+                                isPast || isCurrent || isPosted
+                                  ? ""
+                                  : "var(--card-bg)",
                               borderColor:
-                                isPast || isCurrent ? "" : "var(--card-border)",
+                                isPast || isCurrent || isPosted
+                                  ? ""
+                                  : "var(--card-border)",
                             }}
                           >
                             {isPosted && (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-[6px] text-white">✓</span>
-                              </div>
+                              <span className="text-[10px] text-white">✓</span>
+                            )}
+                            {isCurrent && (
+                              <div className="absolute inset-0 rounded-full animate-ping bg-cyan-400/30" />
                             )}
                           </div>
 
-                          {/* TOOLTIP */}
-                          {timelineTooltip === slotNum && (
-                            <div className="absolute bottom-full mb-3 bg-[#020617] backdrop-blur-2xl border border-white/20 rounded-2xl px-4 py-3 whitespace-nowrap z-50 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
-                              <p className="text-xs font-black text-cyan-400 mb-1">
-                                {s.time}
-                              </p>
-                              <p
-                                className="text-xs font-black uppercase tracking-widest"
-                                style={{ color: "var(--text-primary)" }}
-                              >
-                                {s.geo}
-                              </p>
-                              <p
-                                className="text-[11px] font-bold uppercase tracking-tighter mt-1"
-                                style={{ color: "var(--text-dim)" }}
-                              >
-                                {s.expectation}
-                              </p>
-                            </div>
-                          )}
+                          {/* LABELS */}
+                          <div className="flex flex-col items-center">
+                            <span
+                              className={`text-[10px] font-black uppercase tracking-widest ${
+                                isCurrent ? "text-cyan-400" : ""
+                              }`}
+                              style={{
+                                color: isCurrent ? "" : "var(--text-dim)",
+                              }}
+                            >
+                              {/* Slot X - More Descriptive */}
+                              SLOT {slotNum}
+                            </span>
 
-                          <span
-                            style={{
-                              color: isCurrent ? "" : "var(--text-dim)",
-                            }}
-                            className={`text-[9px] font-black ${
-                              isCurrent ? "text-cyan-400" : ""
-                            }`}
-                          >
-                            {slotNum}
-                          </span>
+                            {isCurrent && (
+                              <span className="text-[9px] font-bold text-cyan-400/80 mt-0.5">
+                                ACTIVE
+                              </span>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
