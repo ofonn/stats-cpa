@@ -310,13 +310,24 @@ function formatTimeAgo(date) {
 
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays === 1) return "1d ago";
+  if (diffDays === 1) return "1d ago";
   return `${diffDays}d ago`;
+}
+
+function formatPST(date) {
+  return date.toLocaleTimeString("en-US", {
+    timeZone: "America/Los_Angeles",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
 
 // --- APP COMPONENT ---
 
 export default function App() {
   const [revenueSoFar, setRevenueSoFar] = useState(0);
+  const [draftRevenue, setDraftRevenue] = useState(""); // NEW: Transactional input state
   const [dailyGoal, setDailyGoal] = useState(35);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [view, setView] = useState("tracker");
@@ -640,10 +651,58 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Mobile Alarm System (Sound + Notification)
+  useEffect(() => {
+    const checkAlarms = () => {
+      const now = new Date();
+      const watMinutes = getWATMinutes(now);
+
+      SCHEDULE.forEach((slot, index) => {
+        const slotNum = index + 1;
+        if (!enabledAlarms.includes(slotNum)) return;
+
+        // Slot Start Time
+        const slotStartMins = (540 + index * SLOT_LENGTH_MIN) % 1440;
+
+        // Alarm Target: 20 minutes BEFORE start
+        const alarmTarget = (slotStartMins - 20 + 1440) % 1440;
+
+        if (watMinutes === alarmTarget) {
+          // Trigger Alarm
+          if (notificationsEnabled) {
+            if (Notification.permission === "granted") {
+              new Notification("Sector Alarm 🚨", {
+                body: `T-Minus 20m: ${slot.emoji} Slot ${slotNum} (${slot.geo})`,
+                icon: "/stats-cpa/icon-192.png",
+                vibrate: [200, 100, 200, 100, 200],
+              });
+            }
+          }
+
+          // Audio Alert (Speech Synthesis)
+          try {
+            const utterance = new SpeechSynthesisUtterance(
+              `Alert. Slot ${slotNum} begins in 20 minutes.`
+            );
+            utterance.rate = 1.0;
+            utterance.pitch = 1.1;
+            window.speechSynthesis.speak(utterance);
+          } catch (e) {
+            console.error("Audio alarm failed", e);
+          }
+        }
+      });
+    };
+
+    const interval = setInterval(checkAlarms, 60000);
+    checkAlarms(); // Check on mount
+    return () => clearInterval(interval);
+  }, [enabledAlarms, notificationsEnabled]);
+
   // Keyboard Shortcuts & Auto-focus
   useEffect(() => {
     if (view === "tracker" && revenueInputRef.current) {
-      revenueInputRef.current.focus();
+      // revenueInputRef.current.focus(); // DISABLED AUTO-FOCUS for Mobile UX
     }
 
     const handleKeyPress = (e) => {
@@ -678,7 +737,17 @@ export default function App() {
 
   const handleRevenueSave = () => {
     if (savingRevenue) return;
+
+    const amountToAdd = parseFloat(draftRevenue);
+    if (isNaN(amountToAdd) || amountToAdd === 0) return; // Ignore empty saves
+
     setSavingRevenue(true);
+
+    // Additive Logic: New Total = Old Total + New Entry
+    const newTotal = revenueSoFar + amountToAdd;
+    setRevenueSoFar(newTotal);
+    setLastUpdated(new Date());
+    setDraftRevenue(""); // Clear input
 
     // Provide visual feedback for the save operation
     setTimeout(() => {
@@ -1155,7 +1224,8 @@ export default function App() {
                     <div className="flex items-center gap-2 font-mono text-xs font-black">
                       <div className="w-1 h-1 rounded-full bg-cyan-400 pulse-glow neon-glow-cyan" />
                       <span style={{ color: "var(--text-dim)" }}>
-                        Slot {slotsCompleted} • {currentSlotData.time}
+                        Slot {slotsCompleted} • {currentSlotData.time} WAT •{" "}
+                        {formatPST(new Date())} PST
                       </span>
                     </div>
                   </div>
@@ -1255,15 +1325,15 @@ export default function App() {
                     className="absolute -left-5 top-1 text-xl font-black italic"
                     style={{ color: "var(--text-dim)", opacity: 0.4 }}
                   >
-                    $
+                    +
                   </span>
                   <input
                     ref={revenueInputRef}
                     type="number"
                     step="0.01"
                     placeholder="0.00"
-                    value={revenueSoFar || ""}
-                    onChange={(e) => handleRevenueChange(e.target.value)}
+                    value={draftRevenue} // Use draft state
+                    onChange={(e) => setDraftRevenue(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -1556,30 +1626,76 @@ export default function App() {
               </div>
 
               {/* 6. Compact Tactical Alert (Dismissible) */}
-              {!alertDismissed && metrics.redsRemaining > 0 && (
-                <div className="glass-card rounded-2xl p-4 flex items-center gap-4 relative animate-in fade-in slide-in-from-bottom-2 duration-500 border-red-500/20 bg-red-500/5">
-                  <button
-                    onClick={() => {
-                      setAlertDismissed(true);
-                      const today = getCPADayKey(new Date());
-                      localStorage.setItem("cpa:alertDismissed", today);
-                    }}
-                    className="absolute top-2 right-2 transition-colors p-1"
-                    style={{ color: "var(--text-dim)" }}
-                  >
-                    ✕
-                  </button>
-                  <div className="p-2 bg-red-500/20 rounded-xl">
-                    <AlertTriangle className="text-red-400" size={18} />
+              {/* 6. NEXT SECTOR CARD (Replaces Red Alert) */}
+              <div className="glass-card rounded-2xl p-5 relative overflow-hidden">
+                <div
+                  className="absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 blur-2xl transition-colors"
+                  style={{ backgroundColor: "var(--card-bg)", opacity: 0.1 }}
+                />
+                <div className="flex items-center justify-between relative z-10">
+                  <div className="space-y-1">
+                    <p
+                      className="text-[9px] font-black uppercase tracking-widest"
+                      style={{ color: "var(--text-dim)" }}
+                    >
+                      Next Mission Sector
+                    </p>
+                    {(() => {
+                      const nextSlot =
+                        SCHEDULE.find((s) => s.slot === slotsCompleted + 1) ||
+                        SCHEDULE[0];
+                      return (
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="text-lg font-black italic tracking-tighter"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {nextSlot.time}
+                          </span>
+                          <span className="text-xs font-black text-cyan-400">
+                            {nextSlot.emoji}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
-                  <p
-                    className="text-[9px] font-black uppercase tracking-widest leading-tight pr-6"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    ALERT: {metrics.redsRemaining} RED SECTORS REMAINING.
-                  </p>
+
+                  <div className="flex items-center gap-3">
+                    {/* ALARM TOGGLE */}
+                    {(() => {
+                      const nextSlotNum = slotsCompleted + 1;
+                      const isAlarmSet = enabledAlarms.includes(nextSlotNum);
+                      return (
+                        <button
+                          onClick={() => {
+                            setEnabledAlarms((prev) => {
+                              const next = prev.includes(nextSlotNum)
+                                ? prev.filter((s) => s !== nextSlotNum)
+                                : [...prev, nextSlotNum];
+                              localStorage.setItem(
+                                "cpa:enabledAlarms",
+                                JSON.stringify(next)
+                              );
+                              return next;
+                            });
+                          }}
+                          className={`p-3 rounded-full transition-all ${
+                            isAlarmSet
+                              ? "bg-cyan-500 text-[#020617] shadow-[0_0_20px_rgba(6,182,212,0.4)] animate-pulse"
+                              : "bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-dim)]"
+                          }`}
+                        >
+                          {isAlarmSet ? (
+                            <Bell size={18} />
+                          ) : (
+                            <BellOff size={18} />
+                          )}
+                        </button>
+                      );
+                    })()}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           )}
 
