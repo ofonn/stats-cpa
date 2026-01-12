@@ -2445,7 +2445,9 @@ export default function App() {
         {showResetModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 transition-all duration-300">
             <div
-              className="absolute inset-0 bg-[#020617]/90 backdrop-blur-xl animate-in fade-in duration-300"
+              className={`absolute inset-0 backdrop-blur-xl animate-in fade-in duration-300 ${
+                isDarkMode ? "bg-[#020617]/90" : "bg-slate-900/40"
+              }`}
               onClick={() => setShowResetModal(false)}
             />
             <div className="relative w-full max-w-sm glass-card rounded-[2.5rem] p-8 text-center animate-in zoom-in-95 duration-300 shadow-[0_0_50px_rgba(239,68,68,0.3)] border-red-500/30">
