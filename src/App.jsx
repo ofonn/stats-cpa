@@ -1461,18 +1461,24 @@ export default function App() {
               <div className="glass-card rounded-2xl p-5">
                 <div className="flex gap-4">
                   <div className="flex flex-col">
-                    <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400">
+                    <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500">
                       Posted
                     </span>
-                    <span className="text-xl font-black italic text-white leading-none">
+                    <span
+                      className="text-xl font-black italic leading-none"
+                      style={{ color: "var(--text-primary)" }}
+                    >
                       {postedSlots.length}
                     </span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[8px] font-black uppercase tracking-widest text-red-400">
-                      Deviated
+                    <span className="text-[8px] font-black uppercase tracking-widest text-red-500">
+                      Skipped
                     </span>
-                    <span className="text-xl font-black italic text-white leading-none">
+                    <span
+                      className="text-xl font-black italic leading-none"
+                      style={{ color: "var(--text-primary)" }}
+                    >
                       {slotsCompleted - postedSlots.length}
                     </span>
                   </div>
@@ -2451,10 +2457,16 @@ export default function App() {
               </div>
 
               <div className="mb-8 space-y-3">
-                <h3 className="text-xl font-black uppercase italic tracking-tighter text-white">
+                <h3
+                  className="text-xl font-black uppercase italic tracking-tighter"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   Atomic Reset
                 </h3>
-                <p className="text-sm font-medium text-white/60 leading-relaxed px-2">
+                <p
+                  className="text-sm font-medium leading-relaxed px-2"
+                  style={{ color: "var(--text-dim)" }}
+                >
                   This will wipe all local data, checkpoints, and history. This
                   action is irreversible.
                 </p>
@@ -2479,7 +2491,8 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setShowResetModal(false)}
-                  className="w-full py-4 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 font-black uppercase tracking-widest text-xs transition-colors"
+                  className="w-full py-4 rounded-xl bg-white/5 hover:bg-white/10 font-black uppercase tracking-widest text-xs transition-colors"
+                  style={{ color: "var(--text-dim)" }}
                 >
                   Abort Mission
                 </button>
