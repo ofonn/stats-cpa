@@ -2641,7 +2641,25 @@ export default function App() {
               className={view === "analytics" ? "animate-pulse" : ""}
             />
             <span className="text-[9px] font-black uppercase tracking-widest">
-              Analytics
+              Stats
+            </span>
+          </button>
+
+          <button
+            onClick={() => setView("history")}
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-full transition-all duration-500 flex-1 ${
+              view === "history"
+                ? "bg-emerald-500/20 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.1)]"
+                : "hover:text-cyan-400"
+            }`}
+            style={{ color: view === "history" ? "" : "var(--text-dim)" }}
+          >
+            <History
+              size={16}
+              className={view === "history" ? "animate-pulse" : ""}
+            />
+            <span className="text-[9px] font-black uppercase tracking-widest">
+              Logs
             </span>
           </button>
 
