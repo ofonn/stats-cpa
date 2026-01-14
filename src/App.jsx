@@ -751,19 +751,33 @@ function Dashboard() {
     const payload = {};
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith("cpa:") && !key.includes("bridge")) {
+      if (
+        key &&
+        key.startsWith("cpa:") &&
+        !key.includes("bridge") &&
+        key !== "cpa:localLastModified"
+      ) {
         payload[key] = localStorage.getItem(key);
       }
     }
     try {
-      const { error } = await supabaseRef.current
+      const { data, error } = await supabaseRef.current
         .from("mission_bridge")
         .upsert({
           id: "sole-user",
           payload,
           updated_at: new Date().toISOString(),
-        });
+        })
+        .select("updated_at");
+
       if (error) throw error;
+
+      if (data && data[0]) {
+        const newServerTime = new Date(data[0].updated_at).getTime();
+        setLocalLastModified(newServerTime);
+        localStorage.setItem("cpa:localLastModified", newServerTime.toString());
+      }
+
       setSyncStatus("connected");
       setLastSyncTime(new Date());
     } catch (err) {
@@ -784,11 +798,20 @@ function Dashboard() {
       if (error && error.code !== "PGRST116") throw error;
       if (data && data.payload) {
         const remoteUpdated = new Date(data.updated_at).getTime();
+
+        // ONLY sync if remote is strictly newer than current local
         if (remoteUpdated > localLastModified) {
           Object.entries(data.payload).forEach(([key, val]) => {
             if (typeof val === "string") localStorage.setItem(key, val);
           });
+
+          // CRITICAL: Update local timestamp to remote timestamp BEFORE reload to prevent infinity
+          localStorage.setItem(
+            "cpa:localLastModified",
+            remoteUpdated.toString()
+          );
           window.location.reload();
+          return;
         }
       }
       setSyncStatus("connected");
