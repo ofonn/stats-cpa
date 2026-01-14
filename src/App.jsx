@@ -358,6 +358,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
   const [reconcileDraft, setReconcileDraft] = useState("");
+  const [selectedArchiveDate, setSelectedArchiveDate] = useState(null);
   const timelineRef = useRef(null);
   const revenueInputRef = useRef(null);
 
@@ -819,6 +820,32 @@ export default function App() {
     const finalRev = parseFloat(reconcileDraft);
     if (isNaN(finalRev)) return;
 
+    // Load checkpoints for the day being reconciled
+    let dayCheckpoints = [];
+    const savedCheckpoints = localStorage.getItem(
+      `cpa:checkpoints:${pendingReconciliation.date}`
+    );
+    if (savedCheckpoints) {
+      try {
+        dayCheckpoints = JSON.parse(savedCheckpoints);
+      } catch (e) {
+        console.error("Failed to parse historical checkpoints", e);
+      }
+    }
+
+    // Add a closing checkpoint if there's a gap between last sync and final
+    const lastCheck = dayCheckpoints[dayCheckpoints.length - 1];
+    if (!lastCheck || finalRev > lastCheck.revenue) {
+      dayCheckpoints.push({
+        time: new Date().toISOString(),
+        revenue: finalRev,
+        slot: 18,
+        delta: lastCheck ? finalRev - lastCheck.revenue : finalRev,
+        projected: finalRev,
+        isClosing: true,
+      });
+    }
+
     const benchmark =
       BENCHMARKS.find((b) => finalRev >= b.min && finalRev < b.max) ||
       BENCHMARKS[0];
@@ -831,6 +858,7 @@ export default function App() {
       status: benchmark.label,
       postedList: SCHEDULE.map((s) => s.slot),
       timestamp: new Date().toISOString(),
+      logs: dayCheckpoints, // Save intraday logs permanently
     };
 
     setHistory((prev) => {
@@ -857,13 +885,31 @@ export default function App() {
 
     setSavingRevenue(true);
 
-    // Cumulative Logic: Current Total = Total from Dashboard
     const oldTotal = revenueSoFar;
     setRevenueSoFar(dashboardTotal);
     setLastUpdated(new Date());
-    setDraftRevenue(""); // Clear input
+    setDraftRevenue("");
 
-    // Provide visual feedback for the save operation
+    // Capture checkpoint with delta and projection
+    const delta = dashboardTotal - oldTotal;
+    const newCheckpoint = {
+      time: new Date().toISOString(),
+      revenue: dashboardTotal,
+      slot: slotsCompleted,
+      delta: delta,
+      projected: metrics.weighted,
+    };
+
+    setCheckpoints((prev) => {
+      const updated = [...prev, newCheckpoint];
+      const dayKey = getCPADayKey(currentTime);
+      localStorage.setItem(
+        `cpa:checkpoints:${dayKey}`,
+        JSON.stringify(updated)
+      );
+      return updated;
+    });
+
     setTimeout(() => {
       setSavingRevenue(false);
       setSavedSuccessfully(true);
@@ -2619,48 +2665,136 @@ export default function App() {
                   .sort((a, b) => b[0].localeCompare(a[0]))
                   .slice(0, 7)
                   .map(([date, stats]) => (
-                    <button
-                      key={date}
-                      onClick={() =>
-                        setEditingRecord({
-                          date,
-                          revenue: stats.revenue,
-                          goal: stats.goal,
-                        })
-                      }
-                      className="w-full glass-card p-6 rounded-[2rem] flex items-center justify-between transition-all text-left group"
-                    >
-                      <div className="space-y-1">
-                        <p
-                          className="text-[11px] font-black uppercase tracking-widest"
-                          style={{ color: "var(--text-dim)" }}
-                        >
-                          {new Date(date).toLocaleDateString()}
-                        </p>
-                        <p className="text-2xl font-black italic text-cyan-400 font-mono tracking-tighter">
-                          ${stats.revenue.toFixed(2)}
-                        </p>
-                      </div>
-                      <div className="text-right space-y-2">
-                        <span
-                          className={`text-[10px] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full ${
-                            stats.revenue >= (stats.goal || dailyGoal)
-                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/20"
-                              : "bg-red-500/10 text-red-400 border border-red-500/10"
-                          }`}
-                        >
-                          {stats.revenue >= (stats.goal || dailyGoal)
-                            ? "SUCCESS"
-                            : "DEVIATION"}
-                        </span>
-                        <p
-                          className="text-[10px] font-black uppercase tracking-tighter"
-                          style={{ color: "var(--text-dim)" }}
-                        >
-                          TARGET VECTOR: ${stats.goal || dailyGoal}
-                        </p>
-                      </div>
-                    </button>
+                    <React.Fragment key={date}>
+                      <button
+                        onClick={() =>
+                          setEditingRecord({
+                            date,
+                            revenue: stats.revenue,
+                            goal: stats.goal,
+                          })
+                        }
+                        className="w-full glass-card p-6 rounded-[2rem] flex items-center justify-between transition-all text-left group"
+                      >
+                        <div className="space-y-1">
+                          <p
+                            className="text-[11px] font-black uppercase tracking-widest"
+                            style={{ color: "var(--text-dim)" }}
+                          >
+                            {new Date(date).toLocaleDateString()}
+                          </p>
+                          <p className="text-2xl font-black italic text-cyan-400 font-mono tracking-tighter">
+                            ${stats.revenue.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="text-right space-y-2">
+                          <span
+                            className={`text-[10px] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full ${
+                              stats.revenue >= (stats.goal || dailyGoal)
+                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/20"
+                                : "bg-red-500/10 text-red-400 border border-red-500/10"
+                            }`}
+                          >
+                            {stats.revenue >= (stats.goal || dailyGoal)
+                              ? "SUCCESS"
+                              : "DEVIATION"}
+                          </span>
+                          {stats.logs && stats.logs.length > 0 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedArchiveDate(
+                                  selectedArchiveDate === date ? null : date
+                                );
+                              }}
+                              className="text-[9px] font-black uppercase tracking-widest text-cyan-400 hover:underline"
+                            >
+                              {selectedArchiveDate === date
+                                ? "Hide Logs"
+                                : `View Logs (${stats.logs.length})`}
+                            </button>
+                          )}
+                          <p
+                            className="text-[10px] font-black uppercase tracking-tighter"
+                            style={{ color: "var(--text-dim)" }}
+                          >
+                            TARGET VECTOR: ${stats.goal || dailyGoal}
+                          </p>
+                        </div>
+                      </button>
+                      {/* Expandable Sync Log Archive */}
+                      {selectedArchiveDate === date && stats.logs && (
+                        <div className="mt-3 p-4 glass-card rounded-2xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-cyan-400">
+                              Sync Log Archive
+                            </h4>
+                            <span
+                              className="text-[9px] font-bold italic"
+                              style={{ color: "var(--text-dim)" }}
+                            >
+                              {stats.logs.length} Checkpoints
+                            </span>
+                          </div>
+                          <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                            {stats.logs.map((log, idx) => (
+                              <div
+                                key={idx}
+                                className={`flex items-center justify-between p-3 rounded-xl transition-all ${
+                                  log.isClosing
+                                    ? "bg-emerald-500/10 border border-emerald-500/20"
+                                    : "bg-[var(--card-bg)] border border-[var(--card-border)]"
+                                }`}
+                              >
+                                <div className="space-y-0.5">
+                                  <p
+                                    className="text-[10px] font-bold"
+                                    style={{ color: "var(--text-dim)" }}
+                                  >
+                                    {new Date(log.time).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                    <span className="ml-2 text-cyan-500">
+                                      Slot {log.slot}
+                                    </span>
+                                    {log.isClosing && (
+                                      <span className="ml-2 text-emerald-400 font-black">
+                                        📋 RECONCILED
+                                      </span>
+                                    )}
+                                  </p>
+                                  <p
+                                    className="text-base font-black italic font-mono"
+                                    style={{ color: "var(--text-primary)" }}
+                                  >
+                                    ${(log.revenue || 0).toFixed(2)}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p
+                                    className={`text-sm font-black italic ${
+                                      (log.delta || 0) >= 0
+                                        ? "text-emerald-400"
+                                        : "text-red-400"
+                                    }`}
+                                  >
+                                    {(log.delta || 0) >= 0 ? "+" : ""}$
+                                    {(log.delta || 0).toFixed(2)}
+                                  </p>
+                                  <p
+                                    className="text-[9px] font-bold"
+                                    style={{ color: "var(--text-dim)" }}
+                                  >
+                                    Proj: ${(log.projected || 0).toFixed(2)}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </React.Fragment>
                   ))}
               </div>
             </div>
