@@ -745,8 +745,13 @@ function Dashboard() {
     }
   }, [bridgeUrl, bridgeKey]);
 
-  const syncPush = async () => {
+  const syncPush = async (manual = false) => {
     if (!supabaseRef.current) return;
+
+    // Cooldown logic: Only skip if not manual and we synced recently
+    const now = new Date().getTime();
+    if (!manual && lastSyncTime && now - lastSyncTime.getTime() < 3000) return;
+
     setSyncStatus("syncing");
     const payload = {};
     for (let i = 0; i < localStorage.length; i++) {
@@ -795,17 +800,37 @@ function Dashboard() {
         .select("payload, updated_at")
         .eq("id", "sole-user")
         .single();
+
       if (error && error.code !== "PGRST116") throw error;
+
       if (data && data.payload) {
         const remoteUpdated = new Date(data.updated_at).getTime();
 
-        // ONLY sync if remote is strictly newer than current local
+        // DESTRUCTIVE SYNC (Cloud = Law)
+        // Only sync if remote is newer OR if a local deletion occurred (manual push handles that)
         if (remoteUpdated > localLastModified) {
+          // Identify all local keys starting with cpa:
+          const localKeys = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith("cpa:") && !key.includes("bridge")) {
+              localKeys.push(key);
+            }
+          }
+
+          // WIPE local data that isn't in the cloud payload (Destructive Sync)
+          localKeys.forEach((lk) => {
+            if (!(lk in data.payload)) {
+              localStorage.removeItem(lk);
+            }
+          });
+
+          // UPDATE/INSERT from cloud
           Object.entries(data.payload).forEach(([key, val]) => {
             if (typeof val === "string") localStorage.setItem(key, val);
           });
 
-          // CRITICAL: Update local timestamp to remote timestamp BEFORE reload to prevent infinity
+          // CRITICAL: Update local timestamp to remote timestamp BEFORE reload
           localStorage.setItem(
             "cpa:localLastModified",
             remoteUpdated.toString()
@@ -1448,20 +1473,24 @@ function Dashboard() {
   }, [syncStatus]);
 
   useEffect(() => {
-    if (supabaseRef.current && syncStatus === "connected") {
+    if (bridgeUrl && bridgeKey && supabaseRef.current) {
       const channel = supabaseRef.current
         .channel("mission-sync")
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "mission_bridge" },
-          () => syncPull()
+          () => {
+            // Background pull only if not currently syncing/pushing
+            if (syncStatus === "connected") syncPull();
+          }
         )
         .subscribe();
+
       return () => {
-        supabaseRef.current.removeChannel(channel);
+        if (supabaseRef.current) supabaseRef.current.removeChannel(channel);
       };
     }
-  }, [syncStatus]);
+  }, [bridgeUrl, bridgeKey]); // Only re-subscribe if credentials change
 
   useEffect(() => {
     const dayKey = getCPADayKey(currentTime);
@@ -1661,6 +1690,8 @@ function Dashboard() {
         return rest;
       });
       setEditingRecord(null);
+      markLocalUpdate(); // Trigger sync push
+      syncPush(true); // Immediate force push for deletion
     }
   };
 
@@ -1975,7 +2006,7 @@ function Dashboard() {
                     }}
                     className="w-full py-4 rounded-xl border border-red-500/20 bg-red-500/5 text-red-500 text-xs font-black uppercase tracking-widest hover:bg-red-500/10 transition-all"
                   >
-                    Reset All Data
+                    Reset All Data (Wipe)
                   </button>
                 </div>
               </div>
@@ -3618,15 +3649,19 @@ function Dashboard() {
 
               <div className="flex flex-col gap-3">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     localStorage.removeItem("cpa:history");
                     localStorage.removeItem("cpa:config");
                     localStorage.removeItem("cpa:checkpoints");
                     Object.keys(localStorage).forEach((key) => {
-                      if (key.startsWith("cpa:")) {
+                      if (key.startsWith("cpa:") && !key.includes("bridge")) {
                         localStorage.removeItem(key);
                       }
                     });
+                    // Broadcast the wipe to cloud before reloading
+                    if (supabaseRef.current) {
+                      await syncPush(true);
+                    }
                     window.location.reload();
                   }}
                   className="w-full py-4 rounded-xl bg-red-500 text-white font-black uppercase tracking-[0.2em] text-xs shadow-lg shadow-red-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
