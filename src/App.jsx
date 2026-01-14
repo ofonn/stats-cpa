@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
 import {
   Clock,
   TrendingUp,
@@ -643,6 +644,28 @@ function Dashboard() {
   const [timelineTooltip, setTimelineTooltip] = useState(null);
   const [checkpoints, setCheckpoints] = useState([]);
   const [isExporting, setIsExporting] = useState(false);
+
+  // --- MISSION BRIDGE (SYNC) STATE ---
+  const [bridgeUrl, setBridgeUrl] = useState(
+    () =>
+      localStorage.getItem("cpa:bridgeUrl") ||
+      "https://atkhbtwebgtmdtmbsggr.supabase.co"
+  );
+  const [bridgeKey, setBridgeKey] = useState(
+    () =>
+      localStorage.getItem("cpa:bridgeKey") ||
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0a2hidHdlYmd0bWR0bWJzZ2dyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzODE0MTksImV4cCI6MjA4Mzk1NzQxOX0.6Xo8s0MqqOhUhrL_S-Kfawgf4Xw9GSmmHh-PjIxpuh8"
+  );
+  const [syncStatus, setSyncStatus] = useState("off"); // off, connected, syncing, error
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [localLastModified, setLocalLastModified] = useState(() =>
+    parseInt(
+      localStorage.getItem("cpa:localLastModified") || Date.now().toString()
+    )
+  );
+  const [syncError, setSyncError] = useState(null);
+  const supabaseRef = useRef(null);
+
   const [pendingReconciliation, setPendingReconciliation] = useState(() => {
     if (typeof window === "undefined") return null;
     const saved = localStorage.getItem("cpa:pendingReconciliation");
@@ -704,6 +727,83 @@ function Dashboard() {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("cpa:notifications") === "true";
   });
+
+  // --- SYNC CORE LOGIC ---
+  useEffect(() => {
+    if (bridgeUrl && bridgeKey) {
+      try {
+        supabaseRef.current = createClient(bridgeUrl, bridgeKey);
+        setSyncStatus("connected");
+        // Initial Pull on connect
+        syncPull();
+      } catch (e) {
+        setSyncStatus("error");
+        setSyncError("Client Init Failed");
+      }
+    } else {
+      setSyncStatus("off");
+    }
+  }, [bridgeUrl, bridgeKey]);
+
+  const syncPush = async () => {
+    if (!supabaseRef.current) return;
+    setSyncStatus("syncing");
+    const payload = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("cpa:") && !key.includes("bridge")) {
+        payload[key] = localStorage.getItem(key);
+      }
+    }
+    try {
+      const { error } = await supabaseRef.current
+        .from("mission_bridge")
+        .upsert({
+          id: "sole-user",
+          payload,
+          updated_at: new Date().toISOString(),
+        });
+      if (error) throw error;
+      setSyncStatus("connected");
+      setLastSyncTime(new Date());
+    } catch (err) {
+      setSyncStatus("error");
+      setSyncError(err.message);
+    }
+  };
+
+  const syncPull = async () => {
+    if (!supabaseRef.current) return;
+    setSyncStatus("syncing");
+    try {
+      const { data, error } = await supabaseRef.current
+        .from("mission_bridge")
+        .select("payload, updated_at")
+        .eq("id", "sole-user")
+        .single();
+      if (error && error.code !== "PGRST116") throw error;
+      if (data && data.payload) {
+        const remoteUpdated = new Date(data.updated_at).getTime();
+        if (remoteUpdated > localLastModified) {
+          Object.entries(data.payload).forEach(([key, val]) => {
+            if (typeof val === "string") localStorage.setItem(key, val);
+          });
+          window.location.reload();
+        }
+      }
+      setSyncStatus("connected");
+      setLastSyncTime(new Date());
+    } catch (err) {
+      setSyncStatus("error");
+      setSyncError(err.message);
+    }
+  };
+
+  const markLocalUpdate = () => {
+    const ts = Date.now();
+    setLocalLastModified(ts);
+    localStorage.setItem("cpa:localLastModified", ts.toString());
+  };
 
   const currentDay = useMemo(() => getCPADayKey(currentTime), [currentTime]);
 
@@ -1230,6 +1330,7 @@ function Dashboard() {
     localStorage.removeItem(`cpa:daily:${pendingReconciliation.date}`);
     localStorage.removeItem(`cpa:posted:${pendingReconciliation.date}`);
     localStorage.removeItem(`cpa:checkpoints:${pendingReconciliation.date}`);
+    markLocalUpdate();
   };
 
   const handleRevenueSave = () => {
@@ -1268,6 +1369,7 @@ function Dashboard() {
     setTimeout(() => {
       setSavingRevenue(false);
       setSavedSuccessfully(true);
+      markLocalUpdate();
       setTimeout(() => setSavedSuccessfully(false), 2000);
     }, 600);
   };
@@ -1299,6 +1401,44 @@ function Dashboard() {
     if (isDarkMode) document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
   }, [isDarkMode]);
+
+  useEffect(() => {
+    localStorage.setItem("cpa:bridgeUrl", bridgeUrl);
+    localStorage.setItem("cpa:bridgeKey", bridgeKey);
+  }, [bridgeUrl, bridgeKey]);
+
+  useEffect(() => {
+    if (syncStatus === "connected" && localLastModified) {
+      const timer = setTimeout(() => {
+        syncPush();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [localLastModified, syncStatus]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (syncStatus === "connected") syncPull();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [syncStatus]);
+
+  useEffect(() => {
+    if (supabaseRef.current && syncStatus === "connected") {
+      const channel = supabaseRef.current
+        .channel("mission-sync")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "mission_bridge" },
+          () => syncPull()
+        )
+        .subscribe();
+      return () => {
+        supabaseRef.current.removeChannel(channel);
+      };
+    }
+  }, [syncStatus]);
 
   useEffect(() => {
     const dayKey = getCPADayKey(currentTime);
@@ -1682,8 +1822,92 @@ function Dashboard() {
                   </button>
                 </div>
 
+                {/* MISSION BRIDGE (SYNC) */}
+                <div
+                  className="space-y-4 pt-4 border-t"
+                  style={{ borderColor: "var(--card-border)" }}
+                >
+                  <div className="flex items-center justify-between">
+                    <p
+                      className="text-[10px] font-black uppercase tracking-widest"
+                      style={{ color: "var(--text-dim)" }}
+                    >
+                      Mission Bridge{" "}
+                      {syncStatus === "syncing"
+                        ? "🔄"
+                        : syncStatus === "connected"
+                        ? "🟢"
+                        : syncStatus === "error"
+                        ? "🔴"
+                        : "🔘"}
+                    </p>
+                    {lastSyncTime && (
+                      <span className="text-[8px] font-black uppercase tracking-widest opacity-40">
+                        {lastSyncTime.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase tracking-[0.2em] opacity-40 px-1">
+                        Bridge URL
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="https://xyz.supabase.co"
+                        value={bridgeUrl}
+                        onChange={(e) => setBridgeUrl(e.target.value)}
+                        className="w-full rounded-xl px-4 py-3 text-xs font-mono focus:ring-1 focus:ring-cyan-500/30 transition-all"
+                        style={{
+                          backgroundColor: "var(--card-bg)",
+                          border: "1px solid var(--card-border)",
+                          color: "var(--text-primary)",
+                        }}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase tracking-[0.2em] opacity-40 px-1">
+                        Bridge Key
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="anon-public-key"
+                        value={bridgeKey}
+                        onChange={(e) => setBridgeKey(e.target.value)}
+                        className="w-full rounded-xl px-4 py-3 text-xs font-mono focus:ring-1 focus:ring-cyan-500/30 transition-all"
+                        style={{
+                          backgroundColor: "var(--card-bg)",
+                          border: "1px solid var(--card-border)",
+                          color: "var(--text-primary)",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {syncError && (
+                    <p className="text-[9px] font-bold text-red-500 bg-red-500/10 p-2 rounded-lg italic">
+                      {syncError}
+                    </p>
+                  )}
+
+                  {syncStatus === "off" && (
+                    <p className="text-[9px] text-slate-500 italic px-1 leading-relaxed">
+                      Enter your keys to enable invisible sync between your
+                      phone and laptop.
+                    </p>
+                  )}
+                </div>
+
                 {/* EXPORT/IMPORT */}
-                <div className="grid grid-cols-2 gap-3">
+                <div
+                  className="grid grid-cols-2 gap-3 pt-4 border-t"
+                  style={{ borderColor: "var(--card-border)" }}
+                >
                   <button
                     onClick={handleExport}
                     className="flex items-center justify-center gap-2 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors"
