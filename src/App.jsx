@@ -334,8 +334,8 @@ function MiniLineChart({ data, width = 280, height = 100, color = "#06b6d4" }) {
   const range = maxVal - minVal || 1;
 
   const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * (width - 20) + 10;
-    const y = height - 10 - ((d.value - minVal) / range) * (height - 20);
+    const x = (i / (data.length - 1)) * (width - 40) + 20; // Added left padding for axis
+    const y = height - 20 - ((d.value - minVal) / range) * (height - 30);
     return `${x},${y}`;
   });
 
@@ -347,12 +347,32 @@ function MiniLineChart({ data, width = 280, height = 100, color = "#06b6d4" }) {
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
+
+      {/* Grid Lines */}
+      <line
+        x1="20"
+        y1={height - 20}
+        x2={width}
+        y2={height - 20}
+        stroke="var(--card-border)"
+        strokeWidth="1"
+      />
+      <line
+        x1="20"
+        y1="10"
+        x2={20}
+        y2={height - 20}
+        stroke="var(--card-border)"
+        strokeWidth="1"
+      />
+
+      {/* Area Fill */}
       <polygon
-        points={`10,${height - 10} ${points.join(" ")} ${width - 10},${
-          height - 10
-        }`}
+        points={`20,${height - 20} ${points.join(" ")} ${width},${height - 20}`}
         fill="url(#lineGradient)"
       />
+
+      {/* Line Path */}
       <polyline
         points={points.join(" ")}
         fill="none"
@@ -361,9 +381,43 @@ function MiniLineChart({ data, width = 280, height = 100, color = "#06b6d4" }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+
+      {/* Axis Labels */}
+      <text
+        x="5"
+        y={height - 20}
+        fontSize="8"
+        fill="var(--text-dim)"
+        fontWeight="bold"
+      >
+        ${minVal.toFixed(0)}
+      </text>
+      <text x="5" y="15" fontSize="8" fill="var(--text-dim)" fontWeight="bold">
+        ${maxVal.toFixed(0)}
+      </text>
+      <text
+        x="20"
+        y={height - 5}
+        fontSize="8"
+        fill="var(--text-dim)"
+        fontWeight="bold"
+      >
+        Start
+      </text>
+      <text
+        x={width - 20}
+        y={height - 5}
+        fontSize="8"
+        fill="var(--text-dim)"
+        fontWeight="bold"
+      >
+        Now
+      </text>
+
+      {/* Data Points */}
       {data.map((d, i) => {
-        const x = (i / (data.length - 1)) * (width - 20) + 10;
-        const y = height - 10 - ((d.value - minVal) / range) * (height - 20);
+        const x = (i / (data.length - 1)) * (width - 40) + 20;
+        const y = height - 20 - ((d.value - minVal) / range) * (height - 30);
         return (
           <circle
             key={i}
@@ -380,7 +434,15 @@ function MiniLineChart({ data, width = 280, height = 100, color = "#06b6d4" }) {
 }
 
 function MiniPieChart({ data, size = 120 }) {
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0)
+    return (
+      <div
+        style={{ width: size, height: size }}
+        className="flex items-center justify-center border-2 border-dashed border-[var(--card-border)] rounded-full opacity-30"
+      >
+        <span className="text-[9px]">No Data</span>
+      </div>
+    );
   const total = data.reduce((sum, d) => sum + d.value, 0) || 1;
   const radius = size / 2 - 10;
   const cx = size / 2;
@@ -427,7 +489,15 @@ function MiniPieChart({ data, size = 120 }) {
 }
 
 function WeeklyBarChart({ data, width = 280, height = 80 }) {
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0)
+    return (
+      <div
+        style={{ width: width, height: height }}
+        className="flex items-center justify-center border border-dashed border-[var(--card-border)] rounded-xl opacity-30"
+      >
+        <span className="text-[10px]">No History Yet</span>
+      </div>
+    );
   const maxVal = Math.max(...data.map((d) => d.value), 1);
   const barWidth = (width - 10) / data.length - 4;
 
@@ -1676,29 +1746,31 @@ export default function App() {
                   CPAGrip Total Sync
                 </h3>
 
-                <div className="relative inline-block mb-4">
+                <div className="relative flex justify-center items-center gap-1 mb-4 h-16">
                   <span
-                    className="absolute -left-6 top-1 text-xl font-black italic"
+                    className="text-2xl font-black italic mb-2"
                     style={{ color: "var(--text-dim)", opacity: 0.4 }}
                   >
                     $
                   </span>
-                  <input
-                    ref={revenueInputRef}
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={draftRevenue} // Use draft state
-                    onChange={(e) => setDraftRevenue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleRevenueSave();
-                      }
-                    }}
-                    className="w-full bg-transparent border-none text-5xl font-black text-center italic tracking-tighter focus:outline-none focus:drop-shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all"
-                    style={{ color: "var(--text-primary)" }}
-                  />
+                  <div className="relative h-full flex items-center">
+                    <input
+                      ref={revenueInputRef}
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={draftRevenue} // Use draft state
+                      onChange={(e) => setDraftRevenue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleRevenueSave();
+                        }
+                      }}
+                      className="w-48 bg-transparent border-none text-5xl font-black text-center italic tracking-tighter focus:outline-none focus:drop-shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all p-0 m-0 leading-none h-full"
+                      style={{ color: "var(--text-primary)" }}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mb-6">
@@ -2315,7 +2387,7 @@ export default function App() {
                 </div>
 
                 {/* INTRADAY LINE CHART */}
-                <div className="glass-card p-4 rounded-2xl flex justify-center relative overflow-hidden">
+                <div className="glass-card p-4 rounded-2xl flex justify-center relative overflow-hidden mt-6">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500/20 to-transparent" />
                   {intradayChartData.length > 1 ? (
                     <MiniLineChart
