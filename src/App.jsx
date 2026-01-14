@@ -437,29 +437,29 @@ function MiniLineChart({ data, width = 280, height = 100, color = "#06b6d4" }) {
       <text
         x="5"
         y={height - 20}
-        fontSize="8"
-        fill="var(--text-dim)"
+        fontSize="10"
+        fill="#94a3b8"
         fontWeight="bold"
       >
         ${minVal.toFixed(0)}
       </text>
-      <text x="5" y="15" fontSize="8" fill="var(--text-dim)" fontWeight="bold">
+      <text x="5" y="15" fontSize="10" fill="#94a3b8" fontWeight="bold">
         ${maxVal.toFixed(0)}
       </text>
       <text
         x="20"
         y={height - 5}
-        fontSize="8"
-        fill="var(--text-dim)"
+        fontSize="10"
+        fill="#94a3b8"
         fontWeight="bold"
       >
         Start
       </text>
       <text
-        x={width - 20}
+        x={width - 25}
         y={height - 5}
-        fontSize="8"
-        fill="var(--text-dim)"
+        fontSize="10"
+        fill="#94a3b8"
         fontWeight="bold"
       >
         Now
@@ -571,9 +571,19 @@ function WeeklyBarChart({ data, width = 280, height = 80 }) {
             />
             <text
               x={x + barWidth / 2}
+              y={y - 5}
+              fontSize="9"
+              fill={d.success ? "#10b981" : "#ef4444"}
+              textAnchor="middle"
+              fontWeight="bold"
+            >
+              ${d.value}
+            </text>
+            <text
+              x={x + barWidth / 2}
               y={height - 2}
-              fontSize="8"
-              fill="var(--text-dim)"
+              fontSize="10"
+              fill="#94a3b8"
               textAnchor="middle"
               fontWeight="bold"
             >
