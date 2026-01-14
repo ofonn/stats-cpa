@@ -1520,7 +1520,7 @@ export default function App() {
 
                 <div className="relative pt-2">
                   <div
-                    className="absolute top-[40px] left-0 right-0 h-0.5 shadow-[0_0_10px_rgba(255,255,255,0.05)]"
+                    className="absolute top-1/2 -translate-y-[12px] left-0 right-0 h-0.5 shadow-[0_0_10px_rgba(255,255,255,0.05)]"
                     style={{ backgroundColor: "var(--card-border)" }}
                   />
                   <div
@@ -1551,11 +1551,13 @@ export default function App() {
                           <div
                             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 relative node-3d ${
                               isCurrent
-                                ? "bg-cyan-500 neon-glow-cyan scale-110"
+                                ? "bg-cyan-500 active-glow scale-110"
                                 : isPosted
                                 ? "bg-emerald-500 neon-glow-emerald"
                                 : isPast
                                 ? "bg-red-500 neon-glow-red"
+                                : !isDarkMode
+                                ? "future-node-light"
                                 : "hover:scale-105"
                             }`}
                             style={{
@@ -2202,8 +2204,7 @@ export default function App() {
                       calendarDate.getMonth() + 1
                     ).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
                     const dayData = history[dateKey];
-                    const isToday =
-                      new Date().toISOString().split("T")[0] === dateKey;
+                    const isToday = currentDay === dateKey;
                     return (
                       <button
                         key={d}
