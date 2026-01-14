@@ -1748,8 +1748,8 @@ export default function App() {
 
                 <div className="relative flex justify-center items-center gap-1 mb-4 h-16">
                   <span
-                    className="text-2xl font-black italic mb-2"
-                    style={{ color: "var(--text-dim)", opacity: 0.4 }}
+                    className="text-6xl font-black italic mb-3 text-cyan-400 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]"
+                    style={{ opacity: 1 }}
                   >
                     $
                   </span>
@@ -3012,7 +3012,7 @@ export default function App() {
                             {new Date(date).toLocaleDateString()}
                           </p>
                           <p className="text-2xl font-black italic text-cyan-400 font-mono tracking-tighter">
-                            ${stats.revenue.toFixed(2)}
+                            ${(stats.revenue || 0).toFixed(2)}
                           </p>
                         </div>
                         <div className="text-right space-y-2">
@@ -3127,7 +3127,7 @@ export default function App() {
                             </p>
                             <div className="flex justify-center">
                               <MiniLineChart
-                                data={stats.logs.map((l) => ({
+                                data={(stats.logs || []).map((l) => ({
                                   value: l.revenue || 0,
                                   label: `S${l.slot}`,
                                 }))}
