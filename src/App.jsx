@@ -21,6 +21,8 @@ import {
   Settings,
   ChevronDown,
   ChevronUp,
+  PieChart,
+  Activity,
 } from "lucide-react";
 
 // --- CONFIGURATION & CONSTANTS ---
@@ -2075,14 +2077,14 @@ export default function App() {
                               className="text-sm font-black italic tracking-tighter"
                               style={{ color: "var(--text-primary)" }}
                             >
-                              Sync Balance: ${log.revenue.toFixed(2)}
+                              Sync Balance: ${(log.revenue || 0).toFixed(2)}
                             </p>
                           </div>
                         </div>
                         <div className="text-right flex flex-col items-end gap-1">
                           <div className="flex flex-col items-end">
                             <span className="text-xs font-black text-emerald-400 font-mono italic leading-none">
-                              +{log.delta.toFixed(2)}
+                              +{(log.delta || 0).toFixed(2)}
                             </span>
                             <p className="text-[7px] font-black uppercase opacity-40">
                               DELTA
@@ -2095,7 +2097,7 @@ export default function App() {
                               style={{ borderTopColor: "var(--card-border)" }}
                             >
                               <span className="text-[9px] font-black text-cyan-400/70 font-mono leading-none">
-                                ${log.projected.toFixed(2)}
+                                ${(log.projected || 0).toFixed(2)}
                               </span>
                               <p className="text-[6px] font-black uppercase opacity-30 tracking-tighter">
                                 PROJ @ SYNC
