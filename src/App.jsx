@@ -352,6 +352,12 @@ export default function App() {
   const [timelineTooltip, setTimelineTooltip] = useState(null);
   const [checkpoints, setCheckpoints] = useState([]);
   const [isExporting, setIsExporting] = useState(false);
+  const [pendingReconciliation, setPendingReconciliation] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const saved = localStorage.getItem("cpa:pendingReconciliation");
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [reconcileDraft, setReconcileDraft] = useState("");
   const timelineRef = useRef(null);
   const revenueInputRef = useRef(null);
 
@@ -560,6 +566,31 @@ export default function App() {
     }, 60000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const lastDayKey = localStorage.getItem("cpa:lastDayKey");
+    if (lastDayKey && lastDayKey !== currentDay) {
+      // Transition detected
+      const prevData = localStorage.getItem(`cpa:daily:${lastDayKey}`);
+      if (prevData) {
+        const parsed = JSON.parse(prevData);
+        if (parsed.revenueSoFar > 0) {
+          const rec = {
+            date: lastDayKey,
+            revenue: parsed.revenueSoFar,
+            goal: parsed.dailyGoal || 35,
+          };
+          setPendingReconciliation(rec);
+          setReconcileDraft(parsed.revenueSoFar.toString());
+          localStorage.setItem(
+            "cpa:pendingReconciliation",
+            JSON.stringify(rec)
+          );
+        }
+      }
+    }
+    localStorage.setItem("cpa:lastDayKey", currentDay);
+  }, [currentDay]);
 
   useEffect(() => {
     const dayKey = getCPADayKey(currentTime);
@@ -787,6 +818,40 @@ export default function App() {
       }
     }
   }, [view, slotsCompleted]);
+
+  const handleReconcile = () => {
+    const finalRev = parseFloat(reconcileDraft);
+    if (isNaN(finalRev)) return;
+
+    const benchmark =
+      BENCHMARKS.find((b) => finalRev >= b.min && finalRev < b.max) ||
+      BENCHMARKS[0];
+
+    const finalizedEntry = {
+      revenue: finalRev,
+      goal: pendingReconciliation.goal || 35,
+      slots: 18,
+      weighted: finalRev,
+      status: benchmark.label,
+      postedList: SCHEDULE.map((s) => s.slot),
+      timestamp: new Date().toISOString(),
+    };
+
+    setHistory((prev) => {
+      const newHistory = {
+        ...prev,
+        [pendingReconciliation.date]: finalizedEntry,
+      };
+      localStorage.setItem("cpa:history", JSON.stringify(newHistory));
+      return newHistory;
+    });
+
+    setPendingReconciliation(null);
+    localStorage.removeItem("cpa:pendingReconciliation");
+    localStorage.removeItem(`cpa:daily:${pendingReconciliation.date}`);
+    localStorage.removeItem(`cpa:posted:${pendingReconciliation.date}`);
+    localStorage.removeItem(`cpa:checkpoints:${pendingReconciliation.date}`);
+  };
 
   const handleRevenueSave = () => {
     if (savingRevenue) return;
@@ -2737,6 +2802,89 @@ export default function App() {
                   style={{ color: "var(--text-dim)" }}
                 >
                   Abort Mission
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* SESSION RECONCILIATION POPUP (AIRPODS STYLE) */}
+        {pendingReconciliation && (
+          <div className="fixed inset-0 z-[300] flex items-end justify-center px-4 pb-1 group/reconcile">
+            <div
+              className={`absolute inset-0 backdrop-blur-sm animate-in fade-in duration-500 ${
+                isDarkMode ? "bg-[#020617]/40" : "bg-slate-900/10"
+              }`}
+            />
+            <div className="relative w-full max-w-lg glass-card rounded-[3rem] p-8 shadow-[0_-20px_60px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom-full duration-700 ease-out border-b-0 rounded-b-none mb-[-4px]">
+              <div className="w-12 h-1.5 bg-slate-500/30 rounded-full mx-auto mb-8 cursor-grab active:cursor-grabbing" />
+
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-16 h-16 bg-emerald-500/20 rounded-3xl flex items-center justify-center border border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                  <CheckCircle className="text-emerald-400" size={32} />
+                </div>
+                <div>
+                  <h2
+                    className="text-2xl font-black italic tracking-tighter"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    Mission Recap
+                  </h2>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500">
+                    Day Ended: {pendingReconciliation.date}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-8">
+                <div
+                  className="p-6 rounded-3xl relative overflow-hidden"
+                  style={{ backgroundColor: "var(--card-bg)" }}
+                >
+                  <div className="absolute top-0 left-0 w-1 h-full bg-slate-500/20" />
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-widest mb-2"
+                    style={{ color: "var(--text-dim)" }}
+                  >
+                    Last Logged Revenue
+                  </p>
+                  <p
+                    className="text-3xl font-black italic font-mono"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    ${pendingReconciliation.revenue.toFixed(2)}
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <label
+                    className="text-[11px] font-black uppercase tracking-widest block px-1"
+                    style={{ color: "var(--text-dim)" }}
+                  >
+                    Absolute Final Dashboard Total
+                  </label>
+                  <div className="relative group">
+                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black italic text-cyan-500">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      value={reconcileDraft}
+                      onChange={(e) => setReconcileDraft(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full bg-[#020617] border-2 border-cyan-500/20 rounded-[2rem] py-8 pl-14 pr-8 text-4xl font-black italic font-mono focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 focus:outline-none transition-all placeholder:text-slate-800"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 px-2 leading-relaxed italic">
+                    Input exactly what you see on your CPAGrip Dashboard to seal
+                    the records for this mission.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleReconcile}
+                  className="w-full bg-cyan-500 hover:bg-cyan-400 text-[#020617] font-black italic py-7 rounded-[2rem] transition-all shadow-[0_20px_40px_rgba(6,182,212,0.2)] active:scale-[0.98] uppercase tracking-widest text-base mb-2"
+                >
+                  Confirm & Lock Archive
                 </button>
               </div>
             </div>
