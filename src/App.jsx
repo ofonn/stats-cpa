@@ -1943,6 +1943,28 @@ function Dashboard() {
                     </div>
                   </div>
 
+                  {/* MANUAL CONTROLS */}
+                  {syncStatus !== "off" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => syncPush(true)}
+                        className="py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border border-cyan-500/20 hover:bg-cyan-500/10 transition-all flex items-center justify-center gap-2"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        <Upload size={12} className="text-cyan-400" /> Upload
+                        Local
+                      </button>
+                      <button
+                        onClick={syncPull}
+                        className="py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border border-cyan-500/20 hover:bg-cyan-500/10 transition-all flex items-center justify-center gap-2"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        <Download size={12} className="text-cyan-400" /> Fetch
+                        Cloud
+                      </button>
+                    </div>
+                  )}
+
                   {syncError && (
                     <p className="text-[9px] font-bold text-red-500 bg-red-500/10 p-2 rounded-lg italic">
                       {syncError}
