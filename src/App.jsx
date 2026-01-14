@@ -325,6 +325,146 @@ function formatPST(date) {
   });
 }
 
+// --- SVG CHART COMPONENTS ---
+
+function MiniLineChart({ data, width = 280, height = 100, color = "#06b6d4" }) {
+  if (!data || data.length < 2) return null;
+  const maxVal = Math.max(...data.map((d) => d.value), 1);
+  const minVal = Math.min(...data.map((d) => d.value), 0);
+  const range = maxVal - minVal || 1;
+
+  const points = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * (width - 20) + 10;
+    const y = height - 10 - ((d.value - minVal) / range) * (height - 20);
+    return `${x},${y}`;
+  });
+
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <defs>
+        <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon
+        points={`10,${height - 10} ${points.join(" ")} ${width - 10},${
+          height - 10
+        }`}
+        fill="url(#lineGradient)"
+      />
+      <polyline
+        points={points.join(" ")}
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {data.map((d, i) => {
+        const x = (i / (data.length - 1)) * (width - 20) + 10;
+        const y = height - 10 - ((d.value - minVal) / range) * (height - 20);
+        return (
+          <circle
+            key={i}
+            cx={x}
+            cy={y}
+            r="3"
+            fill={color}
+            className="opacity-70"
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+function MiniPieChart({ data, size = 120 }) {
+  if (!data || data.length === 0) return null;
+  const total = data.reduce((sum, d) => sum + d.value, 0) || 1;
+  const radius = size / 2 - 10;
+  const cx = size / 2;
+  const cy = size / 2;
+
+  let currentAngle = -90;
+  const slices = data.map((d) => {
+    const angle = (d.value / total) * 360;
+    const startAngle = currentAngle;
+    const endAngle = currentAngle + angle;
+    currentAngle = endAngle;
+
+    const startRad = (startAngle * Math.PI) / 180;
+    const endRad = (endAngle * Math.PI) / 180;
+
+    const x1 = cx + radius * Math.cos(startRad);
+    const y1 = cy + radius * Math.sin(startRad);
+    const x2 = cx + radius * Math.cos(endRad);
+    const y2 = cy + radius * Math.sin(endRad);
+
+    const largeArc = angle > 180 ? 1 : 0;
+
+    return {
+      ...d,
+      path: `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`,
+    };
+  });
+
+  return (
+    <svg width={size} height={size}>
+      {slices.map((slice, i) => (
+        <path
+          key={i}
+          d={slice.path}
+          fill={slice.color}
+          stroke="rgba(0,0,0,0.2)"
+          strokeWidth="1"
+          className="transition-all hover:opacity-80"
+        />
+      ))}
+      <circle cx={cx} cy={cy} r={radius * 0.5} fill="var(--card-bg)" />
+    </svg>
+  );
+}
+
+function WeeklyBarChart({ data, width = 280, height = 80 }) {
+  if (!data || data.length === 0) return null;
+  const maxVal = Math.max(...data.map((d) => d.value), 1);
+  const barWidth = (width - 10) / data.length - 4;
+
+  return (
+    <svg width={width} height={height}>
+      {data.map((d, i) => {
+        const barHeight = (d.value / maxVal) * (height - 20);
+        const x = i * ((width - 10) / data.length) + 5;
+        const y = height - 15 - barHeight;
+        return (
+          <g key={i}>
+            <rect
+              x={x}
+              y={y}
+              width={barWidth}
+              height={barHeight}
+              rx="3"
+              fill={d.success ? "#10b981" : "#ef4444"}
+              className="opacity-80 hover:opacity-100 transition-opacity"
+            />
+            <text
+              x={x + barWidth / 2}
+              y={height - 2}
+              fontSize="8"
+              fill="var(--text-dim)"
+              textAnchor="middle"
+              fontWeight="bold"
+            >
+              {d.label}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 // --- APP COMPONENT ---
 
 export default function App() {
@@ -558,6 +698,43 @@ export default function App() {
 
     return { velocity, yield: yieldAlignment, logs };
   }, [checkpoints, revenueSoFar, slotsCompleted, dailyGoal]);
+
+  // Chart Data Memos
+  const intradayChartData = useMemo(() => {
+    return checkpoints.map((cp) => ({
+      value: cp.revenue || 0,
+      label: `S${cp.slot}`,
+    }));
+  }, [checkpoints]);
+
+  const sectorDistributionData = useMemo(() => {
+    const redTotal = SCHEDULE.filter((s) => s.priority === "RED").length;
+    const blueTotal = SCHEDULE.filter((s) => s.priority === "BLUE").length;
+    const greenTotal = SCHEDULE.filter((s) => s.priority === "GREEN").length;
+    const yellowTotal = SCHEDULE.filter((s) => s.priority === "YELLOW").length;
+
+    return [
+      { label: "RED", value: redTotal, color: "#ef4444" },
+      { label: "BLUE", value: blueTotal, color: "#06b6d4" },
+      { label: "GREEN", value: greenTotal, color: "#10b981" },
+      { label: "YELLOW", value: yellowTotal, color: "#f59e0b" },
+    ].filter((d) => d.value > 0);
+  }, []);
+
+  const weeklyChartData = useMemo(() => {
+    const entries = Object.entries(history)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, 7)
+      .reverse();
+
+    return entries.map(([date, stats]) => ({
+      label: new Date(date)
+        .toLocaleDateString("en-US", { weekday: "short" })
+        .charAt(0),
+      value: stats.revenue || 0,
+      success: stats.revenue >= (stats.goal || dailyGoal),
+    }));
+  }, [history, dailyGoal]);
 
   // Effects
   useEffect(() => {
@@ -2136,6 +2313,25 @@ export default function App() {
                     today
                   </span>
                 </div>
+
+                {/* INTRADAY LINE CHART */}
+                <div className="glass-card p-4 rounded-2xl flex justify-center relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500/20 to-transparent" />
+                  {intradayChartData.length > 1 ? (
+                    <MiniLineChart
+                      data={intradayChartData}
+                      width={280}
+                      height={80}
+                      color="#06b6d4"
+                    />
+                  ) : (
+                    <div className="h-20 w-fit px-8 flex items-center justify-center border border-dashed border-cyan-500/20 rounded-xl bg-cyan-500/5">
+                      <span className="text-[9px] font-black uppercase tracking-widest opacity-50 text-cyan-400">
+                        Awaiting Sync Data
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* GROWTH LOGS (THE NEW LOG VIEW) */}
@@ -2231,6 +2427,66 @@ export default function App() {
 
           {view === "history" && (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+              {/* VISUAL ANALYTICS DASHBOARD */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* WEEKLY TREND (BAR CHART) */}
+                <div className="col-span-2 glass-card rounded-3xl p-5 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <BarChart2 size={64} className="text-cyan-400" />
+                  </div>
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 text-cyan-400 relative z-10">
+                    Weekly Velocity
+                  </h3>
+                  <div className="relative z-10 flex justify-center">
+                    <WeeklyBarChart
+                      data={weeklyChartData}
+                      width={280}
+                      height={100}
+                    />
+                  </div>
+                </div>
+
+                {/* SECTOR DOMINANCE (PIE CHART) */}
+                <div className="glass-card rounded-3xl p-5 flex flex-col items-center justify-center relative overflow-hidden">
+                  <div className="absolute top-0 left-0 p-2 opacity-10">
+                    <PieChart size={48} className="text-emerald-400" />
+                  </div>
+                  <h3 className="text-[9px] font-black uppercase tracking-widest mb-3 text-emerald-400 relative z-10">
+                    Sector Dominance
+                  </h3>
+                  <div className="relative z-10">
+                    <MiniPieChart data={sectorDistributionData} size={100} />
+                  </div>
+                </div>
+
+                {/* WEEKLY STAT SUMMARY */}
+                <div className="glass-card rounded-3xl p-5 flex flex-col justify-center gap-1">
+                  <p
+                    className="text-[9px] font-black uppercase tracking-widest"
+                    style={{ color: "var(--text-dim)" }}
+                  >
+                    7-Day Total
+                  </p>
+                  <p className="text-2xl font-black italic text-cyan-400 font-mono tracking-tighter">
+                    $
+                    {weeklyChartData
+                      .reduce((acc, curr) => acc + curr.value, 0)
+                      .toFixed(2)}
+                  </p>
+                  <div
+                    className={`text-[9px] font-bold px-2 py-0.5 rounded-md w-fit mt-1 uppercase tracking-widest ${
+                      weeklyChartData.filter((d) => d.success).length >= 4
+                        ? "bg-emerald-500/20 text-emerald-400"
+                        : "bg-amber-500/20 text-amber-400"
+                    }`}
+                  >
+                    {weeklyChartData.filter((d) => d.success).length >= 4
+                      ? "On Target"
+                      : "Needs Scale"}
+                  </div>
+                </div>
+              </div>
+
               {/* MISSION LOG (CALENDAR) AT TOP */}
               <div className="glass-card rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-6 px-1">
@@ -2791,6 +3047,23 @@ export default function App() {
                                 </div>
                               </div>
                             ))}
+                          </div>
+                          {/* HISTORICAL INTRADAY GRAPH */}
+                          <div className="pt-2 border-t border-[var(--card-border)]">
+                            <p className="text-[8px] font-black uppercase tracking-widest mb-3 opacity-50 text-center">
+                              Intraday Momentum Visualizer
+                            </p>
+                            <div className="flex justify-center">
+                              <MiniLineChart
+                                data={stats.logs.map((l) => ({
+                                  value: l.revenue || 0,
+                                  label: `S${l.slot}`,
+                                }))}
+                                width={240}
+                                height={60}
+                                color="#10b981"
+                              />
+                            </div>
                           </div>
                         </div>
                       )}
