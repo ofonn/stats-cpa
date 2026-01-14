@@ -570,24 +570,20 @@ export default function App() {
   useEffect(() => {
     const lastDayKey = localStorage.getItem("cpa:lastDayKey");
     if (lastDayKey && lastDayKey !== currentDay) {
-      // Transition detected
+      // Transition detected - find the data for the most recent day worked
       const prevData = localStorage.getItem(`cpa:daily:${lastDayKey}`);
-      if (prevData) {
-        const parsed = JSON.parse(prevData);
-        if (parsed.revenueSoFar > 0) {
-          const rec = {
-            date: lastDayKey,
-            revenue: parsed.revenueSoFar,
-            goal: parsed.dailyGoal || 35,
-          };
-          setPendingReconciliation(rec);
-          setReconcileDraft(parsed.revenueSoFar.toString());
-          localStorage.setItem(
-            "cpa:pendingReconciliation",
-            JSON.stringify(rec)
-          );
-        }
-      }
+      const parsed = prevData
+        ? JSON.parse(prevData)
+        : { revenueSoFar: 0, dailyGoal: dailyGoal };
+
+      const rec = {
+        date: lastDayKey,
+        revenue: parsed.revenueSoFar || 0,
+        goal: parsed.dailyGoal || dailyGoal,
+      };
+      setPendingReconciliation(rec);
+      setReconcileDraft((parsed.revenueSoFar || 0).toString());
+      localStorage.setItem("cpa:pendingReconciliation", JSON.stringify(rec));
     }
     localStorage.setItem("cpa:lastDayKey", currentDay);
   }, [currentDay]);
