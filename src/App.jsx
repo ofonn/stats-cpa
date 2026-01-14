@@ -1520,7 +1520,7 @@ export default function App() {
 
                 <div className="relative pt-2">
                   <div
-                    className="absolute top-[32px] left-0 right-0 h-0.5 shadow-[0_0_10px_rgba(255,255,255,0.05)]"
+                    className="absolute top-[40px] left-0 right-0 h-0.5 shadow-[0_0_10px_rgba(255,255,255,0.05)]"
                     style={{ backgroundColor: "var(--card-border)" }}
                   />
                   <div
@@ -1549,21 +1549,17 @@ export default function App() {
                         >
                           {/* CIRCLE INDICATOR */}
                           <div
-                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all duration-500 relative ${
+                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 relative node-3d ${
                               isCurrent
-                                ? "bg-cyan-400 border-cyan-400 neon-glow-cyan shadow-[0_0_25px_rgba(6,182,212,0.5)] scale-110"
+                                ? "bg-cyan-500 neon-glow-cyan scale-110"
                                 : isPosted
-                                ? "bg-emerald-500 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                                ? "bg-emerald-500 neon-glow-emerald"
                                 : isPast
-                                ? "bg-red-500/30 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
-                                : "hover:border-white/40"
+                                ? "bg-red-500 neon-glow-red"
+                                : "hover:scale-105"
                             }`}
                             style={{
                               backgroundColor:
-                                isPast || isCurrent || isPosted
-                                  ? ""
-                                  : "var(--card-bg)",
-                              borderColor:
                                 isPast || isCurrent || isPosted
                                   ? ""
                                   : "var(--card-border)",

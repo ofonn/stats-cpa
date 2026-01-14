@@ -49,6 +49,16 @@
     box-shadow: 0 0 15px rgba(239, 68, 68, 0.4),
       inset 0 0 8px rgba(239, 68, 68, 0.2);
   }
+
+  .node-3d {
+    background-image: radial-gradient(
+      circle at 30% 30%,
+      rgba(255, 255, 255, 0.3) 0%,
+      transparent 70%
+    );
+    box-shadow: inset -3px -3px 6px rgba(0, 0, 0, 0.3),
+      inset 3px 3px 6px rgba(255, 255, 255, 0.1), 0 4px 10px rgba(0, 0, 0, 0.2);
+  }
 }
 
 /* Deep Space Background Effects */
