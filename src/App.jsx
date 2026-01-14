@@ -407,6 +407,8 @@ export default function App() {
     return localStorage.getItem("cpa:notifications") === "true";
   });
 
+  const currentDay = useMemo(() => getCPADayKey(currentTime), [currentTime]);
+
   // Memos
   const activeWATMinutes = useMemo(() => {
     return getWATMinutes(currentTime);
@@ -1518,14 +1520,14 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="relative pt-2">
+                <div className="relative">
                   <div
-                    className="absolute top-1/2 -translate-y-[12px] left-0 right-0 h-0.5 shadow-[0_0_10px_rgba(255,255,255,0.05)]"
+                    className="absolute top-[36px] left-0 right-0 h-0.5 shadow-[0_0_10px_rgba(255,255,255,0.05)]"
                     style={{ backgroundColor: "var(--card-border)" }}
                   />
                   <div
                     ref={timelineRef}
-                    className="flex items-center justify-between relative overflow-x-auto scrollbar-hide gap-4 px-2 py-4 snap-x"
+                    className="flex items-start justify-between relative overflow-x-auto scrollbar-hide gap-4 px-2 py-5 snap-x"
                   >
                     {SCHEDULE.map((s, i) => {
                       const slotNum = s.slot;
