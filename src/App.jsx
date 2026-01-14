@@ -325,6 +325,56 @@ function formatPST(date) {
   });
 }
 
+// --- ERROR BOUNDARY COMPONENT ---
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed inset-0 z-[999] bg-[#020617] flex items-center justify-center p-6 text-center">
+          <div className="bg-slate-900/50 p-8 rounded-[2rem] border border-red-500/20 max-w-md w-full">
+            <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-6" />
+            <h2 className="text-2xl font-black italic text-red-500 mb-2">
+              Mission Critical Error
+            </h2>
+            <p className="text-xs text-slate-400 mb-8 leading-relaxed">
+              System monitoring detected a fatal crash in the visual core.
+              {this.state.error && (
+                <span className="block mt-2 font-mono text-[10px] bg-black/40 p-2 rounded text-red-400">
+                  {this.state.error.toString()}
+                </span>
+              )}
+            </p>
+            <button
+              onClick={() => {
+                localStorage.clear();
+                window.location.reload();
+              }}
+              className="w-full bg-red-500 hover:bg-red-400 text-white font-black italic py-4 rounded-xl transition-all shadow-lg shadow-red-500/20 uppercase tracking-widest text-xs"
+            >
+              Emergency Factory Reset
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // --- SVG CHART COMPONENTS ---
 
 function MiniLineChart({ data, width = 280, height = 100, color = "#06b6d4" }) {
@@ -771,10 +821,13 @@ export default function App() {
 
   // Chart Data Memos
   const intradayChartData = useMemo(() => {
-    return checkpoints.map((cp) => ({
-      value: cp.revenue || 0,
-      label: `S${cp.slot}`,
-    }));
+    if (!checkpoints || !Array.isArray(checkpoints)) return [];
+    return checkpoints
+      .filter((cp) => cp && typeof cp.revenue === "number")
+      .map((cp) => ({
+        value: cp.revenue || 0,
+        label: `S${cp.slot}`,
+      }));
   }, [checkpoints]);
 
   const sectorDistributionData = useMemo(() => {
@@ -792,7 +845,9 @@ export default function App() {
   }, []);
 
   const weeklyChartData = useMemo(() => {
+    if (!history || typeof history !== "object") return [];
     const entries = Object.entries(history)
+      .filter(([_, stats]) => stats && typeof stats.revenue === "number") // Sanitize garbage
       .sort((a, b) => b[0].localeCompare(a[0]))
       .slice(0, 7)
       .reverse();
@@ -2498,651 +2553,658 @@ export default function App() {
           )}
 
           {view === "history" && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-              {/* VISUAL ANALYTICS DASHBOARD */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* WEEKLY TREND (BAR CHART) */}
-                <div className="col-span-2 glass-card rounded-3xl p-5 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <BarChart2 size={64} className="text-cyan-400" />
+            <ErrorBoundary>
+              <div className="space-y-4 pb-20">
+                {/* VISUAL ANALYTICS DASHBOARD */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* WEEKLY TREND (BAR CHART) */}
+                  <div className="col-span-2 glass-card rounded-3xl p-5 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                      <BarChart2 size={64} className="text-cyan-400" />
+                    </div>
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 text-cyan-400 relative z-10">
+                      Weekly Velocity
+                    </h3>
+                    <div className="relative z-10 flex justify-center">
+                      <WeeklyBarChart
+                        data={weeklyChartData}
+                        width={280}
+                        height={100}
+                      />
+                    </div>
                   </div>
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 text-cyan-400 relative z-10">
-                    Weekly Velocity
-                  </h3>
-                  <div className="relative z-10 flex justify-center">
-                    <WeeklyBarChart
-                      data={weeklyChartData}
-                      width={280}
-                      height={100}
-                    />
-                  </div>
-                </div>
 
-                {/* SECTOR DOMINANCE (PIE CHART) */}
-                <div className="glass-card rounded-3xl p-5 flex flex-col items-center justify-center relative overflow-hidden">
-                  <div className="absolute top-0 left-0 p-2 opacity-10">
-                    <PieChart size={48} className="text-emerald-400" />
+                  {/* SECTOR DOMINANCE (PIE CHART) */}
+                  <div className="glass-card rounded-3xl p-5 flex flex-col items-center justify-center relative overflow-hidden">
+                    <div className="absolute top-0 left-0 p-2 opacity-10">
+                      <PieChart size={48} className="text-emerald-400" />
+                    </div>
+                    <h3 className="text-[9px] font-black uppercase tracking-widest mb-3 text-emerald-400 relative z-10">
+                      Sector Dominance
+                    </h3>
+                    <div className="relative z-10">
+                      <MiniPieChart data={sectorDistributionData} size={100} />
+                    </div>
                   </div>
-                  <h3 className="text-[9px] font-black uppercase tracking-widest mb-3 text-emerald-400 relative z-10">
-                    Sector Dominance
-                  </h3>
-                  <div className="relative z-10">
-                    <MiniPieChart data={sectorDistributionData} size={100} />
-                  </div>
-                </div>
 
-                {/* WEEKLY STAT SUMMARY */}
-                <div className="glass-card rounded-3xl p-5 flex flex-col justify-center gap-1">
-                  <p
-                    className="text-[9px] font-black uppercase tracking-widest"
-                    style={{ color: "var(--text-dim)" }}
-                  >
-                    7-Day Total
-                  </p>
-                  <p className="text-2xl font-black italic text-cyan-400 font-mono tracking-tighter">
-                    $
-                    {weeklyChartData
-                      .reduce((acc, curr) => acc + curr.value, 0)
-                      .toFixed(2)}
-                  </p>
-                  <div
-                    className={`text-[9px] font-bold px-2 py-0.5 rounded-md w-fit mt-1 uppercase tracking-widest ${
-                      weeklyChartData.filter((d) => d.success).length >= 4
-                        ? "bg-emerald-500/20 text-emerald-400"
-                        : "bg-amber-500/20 text-amber-400"
-                    }`}
-                  >
-                    {weeklyChartData.filter((d) => d.success).length >= 4
-                      ? "On Target"
-                      : "Needs Scale"}
-                  </div>
-                </div>
-              </div>
-
-              {/* MISSION LOG (CALENDAR) AT TOP */}
-              <div className="glass-card rounded-3xl p-6">
-                <div className="flex items-center justify-between mb-6 px-1">
-                  <h2 className="text-xs font-black uppercase tracking-[0.2em] text-cyan-400">
-                    Mission Log
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() =>
-                        setCalendarDate(
-                          new Date(
-                            calendarDate.setMonth(calendarDate.getMonth() - 1)
-                          )
-                        )
-                      }
-                      className="p-2.5 rounded-xl transition-colors"
-                      style={{
-                        backgroundColor: "var(--card-bg)",
-                        border: "1px solid var(--card-border)",
-                      }}
-                    >
-                      <ChevronLeft size={14} />
-                    </button>
-                    <span className="text-[10px] font-black uppercase italic tracking-widest bg-cyan-400 text-[#020617] px-3 py-1 rounded-lg">
-                      {calendarDate.toLocaleDateString("default", {
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </span>
-                    <button
-                      onClick={() =>
-                        setCalendarDate(
-                          new Date(
-                            calendarDate.setMonth(calendarDate.getMonth() + 1)
-                          )
-                        )
-                      }
-                      className="p-2.5 rounded-xl transition-colors"
-                      style={{
-                        backgroundColor: "var(--card-bg)",
-                        border: "1px solid var(--card-border)",
-                      }}
-                    >
-                      <ChevronRight size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-7 gap-1 mb-2">
-                  {["S", "M", "T", "W", "T", "F", "S"].map((day, i) => (
-                    <div
-                      key={i}
-                      className="text-center text-[8px] font-black uppercase"
+                  {/* WEEKLY STAT SUMMARY */}
+                  <div className="glass-card rounded-3xl p-5 flex flex-col justify-center gap-1">
+                    <p
+                      className="text-[9px] font-black uppercase tracking-widest"
                       style={{ color: "var(--text-dim)" }}
                     >
-                      {day}
+                      7-Day Total
+                    </p>
+                    <p className="text-2xl font-black italic text-cyan-400 font-mono tracking-tighter">
+                      $
+                      {weeklyChartData
+                        .reduce((acc, curr) => acc + curr.value, 0)
+                        .toFixed(2)}
+                    </p>
+                    <div
+                      className={`text-[9px] font-bold px-2 py-0.5 rounded-md w-fit mt-1 uppercase tracking-widest ${
+                        weeklyChartData.filter((d) => d.success).length >= 4
+                          ? "bg-emerald-500/20 text-emerald-400"
+                          : "bg-amber-500/20 text-amber-400"
+                      }`}
+                    >
+                      {weeklyChartData.filter((d) => d.success).length >= 4
+                        ? "On Target"
+                        : "Needs Scale"}
                     </div>
-                  ))}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-7 gap-1">
-                  {Array.from({
-                    length: new Date(
-                      calendarDate.getFullYear(),
-                      calendarDate.getMonth(),
-                      1
-                    ).getDay(),
-                  }).map((_, i) => (
-                    <div key={`empty-${i}`} className="aspect-square"></div>
-                  ))}
-                  {Array.from({
-                    length: new Date(
-                      calendarDate.getFullYear(),
-                      calendarDate.getMonth() + 1,
-                      0
-                    ).getDate(),
-                  }).map((_, i) => {
-                    const d = i + 1;
-                    const dateKey = `${calendarDate.getFullYear()}-${String(
-                      calendarDate.getMonth() + 1
-                    ).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-                    const dayData = history[dateKey];
-                    const isToday = currentDay === dateKey;
-                    return (
+                {/* MISSION LOG (CALENDAR) AT TOP */}
+                <div className="glass-card rounded-3xl p-6">
+                  <div className="flex items-center justify-between mb-6 px-1">
+                    <h2 className="text-xs font-black uppercase tracking-[0.2em] text-cyan-400">
+                      Mission Log
+                    </h2>
+                    <div className="flex items-center gap-2">
                       <button
-                        key={d}
                         onClick={() =>
-                          setEditingRecord({
-                            date: dateKey,
-                            revenue: dayData?.revenue || 0,
-                            goal: dayData?.goal || dailyGoal,
-                          })
+                          setCalendarDate(
+                            new Date(
+                              calendarDate.setMonth(calendarDate.getMonth() - 1)
+                            )
+                          )
                         }
-                        className={`aspect-square rounded-lg flex flex-col items-center justify-center text-[10px] font-black border ${
-                          dayData
-                            ? dayData.revenue >= (dayData.goal || dailyGoal)
-                              ? "bg-emerald-500/20 border-emerald-500/40"
-                              : "bg-red-500/10 border-red-500/20"
-                            : isToday
-                            ? "bg-cyan-500/20 border-cyan-500/40"
-                            : "border"
-                        }`}
+                        className="p-2.5 rounded-xl transition-colors"
                         style={{
-                          backgroundColor:
-                            dayData || isToday ? "" : "var(--card-bg)",
-                          borderColor:
-                            dayData || isToday ? "" : "var(--card-border)",
+                          backgroundColor: "var(--card-bg)",
+                          border: "1px solid var(--card-border)",
                         }}
                       >
-                        <span
-                          style={{ color: isToday ? "" : "var(--text-dim)" }}
-                          className={isToday ? "text-cyan-400" : ""}
-                        >
-                          {d}
-                        </span>
-                        {dayData && (
-                          <span
-                            className="text-[7px]"
-                            style={{ color: "var(--text-dim)" }}
-                          >
-                            $
-                            {dayData.revenue >= 1000
-                              ? `${(dayData.revenue / 1000).toFixed(1)}k`
-                              : dayData.revenue.toFixed(0)}
-                          </span>
-                        )}
+                        <ChevronLeft size={14} />
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
+                      <span className="text-[10px] font-black uppercase italic tracking-widest bg-cyan-400 text-[#020617] px-3 py-1 rounded-lg">
+                        {calendarDate.toLocaleDateString("default", {
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setCalendarDate(
+                            new Date(
+                              calendarDate.setMonth(calendarDate.getMonth() + 1)
+                            )
+                          )
+                        }
+                        className="p-2.5 rounded-xl transition-colors"
+                        style={{
+                          backgroundColor: "var(--card-bg)",
+                          border: "1px solid var(--card-border)",
+                        }}
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </div>
 
-              {/* COLLAPSIBLE SECTIONS */}
-              <div className="space-y-3">
-                {/* Pattern Recognition */}
-                <div className="glass-card rounded-2xl overflow-hidden">
-                  <button
-                    onClick={() =>
-                      setCollapsedSections((prev) => ({
-                        ...prev,
-                        pattern: !prev.pattern,
-                      }))
-                    }
-                    className="w-full flex items-center justify-between p-4"
-                    style={{ backgroundColor: "var(--card-bg)" }}
-                  >
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-400">
-                      Pattern Recognition
-                    </h3>
-                    {collapsedSections.pattern ? (
-                      <ChevronDown size={14} />
-                    ) : (
-                      <ChevronUp size={14} />
-                    )}
-                  </button>
-                  {!collapsedSections.pattern && analytics && (
-                    <div className="p-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                      <div className="flex justify-between">
-                        <span
-                          className="text-[10px] font-black uppercase"
-                          style={{ color: "var(--text-dim)" }}
-                        >
-                          Weekly Total
-                        </span>
-                        <span className="text-base font-black italic text-emerald-400 font-mono">
-                          ${analytics.weekTotal.toFixed(2)}
-                        </span>
+                  <div className="grid grid-cols-7 gap-1 mb-2">
+                    {["S", "M", "T", "W", "T", "F", "S"].map((day, i) => (
+                      <div
+                        key={i}
+                        className="text-center text-[8px] font-black uppercase"
+                        style={{ color: "var(--text-dim)" }}
+                      >
+                        {day}
                       </div>
-                      <div className="flex justify-between">
-                        <span
-                          className="text-[10px] font-black uppercase"
-                          style={{ color: "var(--text-dim)" }}
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1">
+                    {Array.from({
+                      length: new Date(
+                        calendarDate.getFullYear(),
+                        calendarDate.getMonth(),
+                        1
+                      ).getDay(),
+                    }).map((_, i) => (
+                      <div key={`empty-${i}`} className="aspect-square"></div>
+                    ))}
+                    {Array.from({
+                      length: new Date(
+                        calendarDate.getFullYear(),
+                        calendarDate.getMonth() + 1,
+                        0
+                      ).getDate(),
+                    }).map((_, i) => {
+                      const d = i + 1;
+                      const dateKey = `${calendarDate.getFullYear()}-${String(
+                        calendarDate.getMonth() + 1
+                      ).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                      const dayData = history[dateKey];
+                      const isToday = currentDay === dateKey;
+                      return (
+                        <button
+                          key={d}
+                          onClick={() =>
+                            setEditingRecord({
+                              date: dateKey,
+                              revenue: dayData?.revenue || 0,
+                              goal: dayData?.goal || dailyGoal,
+                            })
+                          }
+                          className={`aspect-square rounded-lg flex flex-col items-center justify-center text-[10px] font-black border ${
+                            dayData
+                              ? dayData.revenue >= (dayData.goal || dailyGoal)
+                                ? "bg-emerald-500/20 border-emerald-500/40"
+                                : "bg-red-500/10 border-red-500/20"
+                              : isToday
+                              ? "bg-cyan-500/20 border-cyan-500/40"
+                              : "border"
+                          }`}
+                          style={{
+                            backgroundColor:
+                              dayData || isToday ? "" : "var(--card-bg)",
+                            borderColor:
+                              dayData || isToday ? "" : "var(--card-border)",
+                          }}
                         >
-                          Daily Avg
-                        </span>
-                        <span className="text-base font-black italic text-cyan-400 font-mono">
-                          ${analytics.avgDaily.toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="space-y-3 pt-3">
-                        <div>
-                          <div className="flex justify-between text-[9px] font-black uppercase mb-1">
-                            <span className="text-red-500">RED Hit Rate</span>
-                            <span className="text-red-500">
-                              {analytics.redRate.toFixed(0)}%
-                            </span>
-                          </div>
-                          <div
-                            className="h-1 rounded-full overflow-hidden"
-                            style={{ backgroundColor: "var(--card-border)" }}
+                          <span
+                            style={{ color: isToday ? "" : "var(--text-dim)" }}
+                            className={isToday ? "text-cyan-400" : ""}
                           >
-                            <div
-                              className="h-full bg-red-500"
-                              style={{ width: `${analytics.redRate}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                            {d}
+                          </span>
+                          {dayData && (
+                            <span
+                              className="text-[7px]"
+                              style={{ color: "var(--text-dim)" }}
+                            >
+                              $
+                              {dayData.revenue >= 1000
+                                ? `${(dayData.revenue / 1000).toFixed(1)}k`
+                                : dayData.revenue.toFixed(0)}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Tactical Milestones */}
-                <div className="glass-card rounded-2xl overflow-hidden">
-                  <button
-                    onClick={() =>
-                      setCollapsedSections((prev) => ({
-                        ...prev,
-                        milestones: !prev.milestones,
-                      }))
-                    }
-                    className="w-full flex items-center justify-between p-4"
-                    style={{ backgroundColor: "var(--card-bg)" }}
-                  >
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-400">
-                      Tactical Milestones
-                    </h3>
-                    {collapsedSections.milestones ? (
-                      <ChevronDown size={14} />
-                    ) : (
-                      <ChevronUp size={14} />
-                    )}
-                  </button>
-                  {!collapsedSections.milestones && analytics && (
-                    <div className="p-5 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                      <div className="p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
-                        <p className="text-[8px] font-black text-emerald-400 uppercase mb-1">
-                          Peak Operation
-                        </p>
-                        <p
-                          className="text-xl font-black italic font-mono"
-                          style={{ color: "var(--text-primary)" }}
-                        >
-                          ${analytics.bestDay?.revenue.toFixed(2) || "0.00"}
-                        </p>
-                      </div>
-                      <div className="p-4 bg-red-500/5 rounded-xl border border-red-500/10">
-                        <p className="text-[8px] font-black text-red-400 uppercase mb-1">
-                          Lowest Sector
-                        </p>
-                        <p className="text-xl font-black italic text-red-400 font-mono">
-                          ${analytics.worstDay?.revenue.toFixed(2) || "0.00"}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Slot Performance Analysis */}
-                {Object.keys(history).length >= 3 && (
+                {/* COLLAPSIBLE SECTIONS */}
+                <div className="space-y-3">
+                  {/* Pattern Recognition */}
                   <div className="glass-card rounded-2xl overflow-hidden">
                     <button
                       onClick={() =>
                         setCollapsedSections((prev) => ({
                           ...prev,
-                          performance: !prev.performance,
+                          pattern: !prev.pattern,
                         }))
                       }
                       className="w-full flex items-center justify-between p-4"
                       style={{ backgroundColor: "var(--card-bg)" }}
                     >
                       <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-400">
-                        Slot Performance
+                        Pattern Recognition
                       </h3>
-                      {collapsedSections.performance ? (
+                      {collapsedSections.pattern ? (
                         <ChevronDown size={14} />
                       ) : (
                         <ChevronUp size={14} />
                       )}
                     </button>
-                    {!collapsedSections.performance && (
-                      <div className="p-5 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                        {calculateSlotPerformance()
-                          .slice(0, 5)
-                          .map((slot) => (
-                            <div
-                              key={slot.slot}
-                              className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5"
-                            >
-                              <div className="flex items-center gap-3">
-                                <span className="text-lg">{slot.emoji}</span>
-                                <span className="text-[10px] font-black">
-                                  Slot {slot.slot}
-                                </span>
-                              </div>
-                              <span className="text-sm font-black text-emerald-400 font-mono">
-                                {slot.hitRate}%
+                    {!collapsedSections.pattern && analytics && (
+                      <div className="p-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="flex justify-between">
+                          <span
+                            className="text-[10px] font-black uppercase"
+                            style={{ color: "var(--text-dim)" }}
+                          >
+                            Weekly Total
+                          </span>
+                          <span className="text-base font-black italic text-emerald-400 font-mono">
+                            ${analytics.weekTotal.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span
+                            className="text-[10px] font-black uppercase"
+                            style={{ color: "var(--text-dim)" }}
+                          >
+                            Daily Avg
+                          </span>
+                          <span className="text-base font-black italic text-cyan-400 font-mono">
+                            ${analytics.avgDaily.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="space-y-3 pt-3">
+                          <div>
+                            <div className="flex justify-between text-[9px] font-black uppercase mb-1">
+                              <span className="text-red-500">RED Hit Rate</span>
+                              <span className="text-red-500">
+                                {analytics.redRate.toFixed(0)}%
                               </span>
                             </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Intraday Timeline remains at bottom for history context */}
-              {checkpoints.length > 0 && (
-                <div className="glass-card rounded-3xl p-6 border-white/5">
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-4">
-                    Intraday Timeline
-                  </h3>
-                  <div className="space-y-2">
-                    {checkpoints.map((cp, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-4 rounded-xl border"
-                        style={{
-                          backgroundColor: "var(--card-bg)",
-                          borderColor: "var(--card-border)",
-                        }}
-                      >
-                        <div
-                          className="text-[10px] font-black uppercase"
-                          style={{ color: "var(--text-dim)" }}
-                        >
-                          Slot {cp.slot} •{" "}
-                          {new Date(cp.time).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </div>
-                        <div className="text-lg font-black text-cyan-400 font-mono">
-                          ${cp.revenue.toFixed(2)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Inline Editing Interface */}
-              {editingRecord && (
-                <div className="glass-card rounded-[2.5rem] p-8 border-cyan-500/30 shadow-[0_0_50px_rgba(6,182,212,0.1)] animate-in fade-in zoom-in-95 duration-300">
-                  <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-cyan-400">
-                      Edit Tactical Record: {editingRecord.date}
-                    </h3>
-                    <button
-                      onClick={() => setEditingRecord(null)}
-                      className="p-2 text-white/20 hover:text-white transition-colors bg-white/5 rounded-lg"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="space-y-8">
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="group">
-                        <label
-                          className="block text-[10px] font-black uppercase tracking-widest mb-3 group-hover:text-cyan-400 transition-colors"
-                          style={{ color: "var(--text-dim)" }}
-                        >
-                          Revenue ($)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={editingRecord.revenue}
-                          onChange={(e) =>
-                            setEditingRecord({
-                              ...editingRecord,
-                              revenue: e.target.value,
-                            })
-                          }
-                          className="w-full rounded-2xl px-6 py-4 text-base font-black focus:ring-2 focus:ring-cyan-500/50 transition-all italic"
-                          style={{
-                            backgroundColor: "var(--card-bg)",
-                            border: "1px solid var(--card-border)",
-                            color: "var(--text-primary)",
-                          }}
-                        />
-                      </div>
-                      <div className="group">
-                        <label
-                          className="block text-[10px] font-black uppercase tracking-widest mb-3 group-hover:text-cyan-400 transition-colors"
-                          style={{ color: "var(--text-dim)" }}
-                        >
-                          Goal ($)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={editingRecord.goal}
-                          onChange={(e) =>
-                            setEditingRecord({
-                              ...editingRecord,
-                              goal: e.target.value,
-                            })
-                          }
-                          className="w-full rounded-2xl px-6 py-4 text-base font-black focus:ring-2 focus:ring-cyan-500/50 transition-all italic"
-                          style={{
-                            backgroundColor: "var(--card-bg)",
-                            border: "1px solid var(--card-border)",
-                            color: "var(--text-primary)",
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-4">
-                      <button
-                        onClick={() =>
-                          handleSaveHistory(
-                            editingRecord.date,
-                            editingRecord.revenue,
-                            editingRecord.goal
-                          )
-                        }
-                        className="flex-1 bg-cyan-500 text-[#020617] py-4 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
-                      >
-                        Commit Record
-                      </button>
-                      <button
-                        onClick={() => handleDeleteHistory(editingRecord.date)}
-                        className="px-8 bg-red-500/10 text-red-400 py-4 rounded-2xl text-xs font-black uppercase tracking-widest border border-red-500/10 hover:bg-red-500/20 transition-all"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* History Details */}
-              <div className="space-y-4">
-                <h3
-                  className="text-xs font-black uppercase tracking-[0.3em] px-1"
-                  style={{ color: "var(--text-dim)" }}
-                >
-                  Mission Log Archive
-                </h3>
-                {Object.entries(history)
-                  .sort((a, b) => b[0].localeCompare(a[0]))
-                  .slice(0, 7)
-                  .map(([date, stats]) => (
-                    <React.Fragment key={date}>
-                      <button
-                        onClick={() =>
-                          setEditingRecord({
-                            date,
-                            revenue: stats.revenue,
-                            goal: stats.goal,
-                          })
-                        }
-                        className="w-full glass-card p-6 rounded-[2rem] flex items-center justify-between transition-all text-left group"
-                      >
-                        <div className="space-y-1">
-                          <p
-                            className="text-[11px] font-black uppercase tracking-widest"
-                            style={{ color: "var(--text-dim)" }}
-                          >
-                            {new Date(date).toLocaleDateString()}
-                          </p>
-                          <p className="text-2xl font-black italic text-cyan-400 font-mono tracking-tighter">
-                            ${(stats.revenue || 0).toFixed(2)}
-                          </p>
-                        </div>
-                        <div className="text-right space-y-2">
-                          <span
-                            className={`text-[10px] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full ${
-                              stats.revenue >= (stats.goal || dailyGoal)
-                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/20"
-                                : "bg-red-500/10 text-red-400 border border-red-500/10"
-                            }`}
-                          >
-                            {stats.revenue >= (stats.goal || dailyGoal)
-                              ? "SUCCESS"
-                              : "DEVIATION"}
-                          </span>
-                          {stats.logs && stats.logs.length > 0 && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedArchiveDate(
-                                  selectedArchiveDate === date ? null : date
-                                );
-                              }}
-                              className="text-[9px] font-black uppercase tracking-widest text-cyan-400 hover:underline"
+                            <div
+                              className="h-1 rounded-full overflow-hidden"
+                              style={{ backgroundColor: "var(--card-border)" }}
                             >
-                              {selectedArchiveDate === date
-                                ? "Hide Logs"
-                                : `View Logs (${stats.logs.length})`}
-                            </button>
-                          )}
-                          <p
-                            className="text-[10px] font-black uppercase tracking-tighter"
-                            style={{ color: "var(--text-dim)" }}
-                          >
-                            TARGET VECTOR: ${stats.goal || dailyGoal}
-                          </p>
-                        </div>
-                      </button>
-                      {/* Expandable Sync Log Archive */}
-                      {selectedArchiveDate === date && stats.logs && (
-                        <div className="mt-3 p-4 glass-card rounded-2xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-[10px] font-black uppercase tracking-widest text-cyan-400">
-                              Sync Log Archive
-                            </h4>
-                            <span
-                              className="text-[9px] font-bold italic"
-                              style={{ color: "var(--text-dim)" }}
-                            >
-                              {stats.logs.length} Checkpoints
-                            </span>
-                          </div>
-                          <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-                            {stats.logs.map((log, idx) => (
                               <div
-                                key={idx}
-                                className={`flex items-center justify-between p-3 rounded-xl transition-all ${
-                                  log.isClosing
-                                    ? "bg-emerald-500/10 border border-emerald-500/20"
-                                    : "bg-[var(--card-bg)] border border-[var(--card-border)]"
-                                }`}
-                              >
-                                <div className="space-y-0.5">
-                                  <p
-                                    className="text-[10px] font-bold"
-                                    style={{ color: "var(--text-dim)" }}
-                                  >
-                                    {new Date(log.time).toLocaleTimeString([], {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}
-                                    <span className="ml-2 text-cyan-500">
-                                      Slot {log.slot}
-                                    </span>
-                                    {log.isClosing && (
-                                      <span className="ml-2 text-emerald-400 font-black">
-                                        📋 RECONCILED
-                                      </span>
-                                    )}
-                                  </p>
-                                  <p
-                                    className="text-base font-black italic font-mono"
-                                    style={{ color: "var(--text-primary)" }}
-                                  >
-                                    ${(log.revenue || 0).toFixed(2)}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p
-                                    className={`text-sm font-black italic ${
-                                      (log.delta || 0) >= 0
-                                        ? "text-emerald-400"
-                                        : "text-red-400"
-                                    }`}
-                                  >
-                                    {(log.delta || 0) >= 0 ? "+" : ""}$
-                                    {(log.delta || 0).toFixed(2)}
-                                  </p>
-                                  <p
-                                    className="text-[9px] font-bold"
-                                    style={{ color: "var(--text-dim)" }}
-                                  >
-                                    Proj: ${(log.projected || 0).toFixed(2)}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          {/* HISTORICAL INTRADAY GRAPH */}
-                          <div className="pt-2 border-t border-[var(--card-border)]">
-                            <p className="text-[8px] font-black uppercase tracking-widest mb-3 opacity-50 text-center">
-                              Intraday Momentum Visualizer
-                            </p>
-                            <div className="flex justify-center">
-                              <MiniLineChart
-                                data={(stats.logs || []).map((l) => ({
-                                  value: l.revenue || 0,
-                                  label: `S${l.slot}`,
-                                }))}
-                                width={240}
-                                height={60}
-                                color="#10b981"
+                                className="h-full bg-red-500"
+                                style={{ width: `${analytics.redRate}%` }}
                               />
                             </div>
                           </div>
                         </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tactical Milestones */}
+                  <div className="glass-card rounded-2xl overflow-hidden">
+                    <button
+                      onClick={() =>
+                        setCollapsedSections((prev) => ({
+                          ...prev,
+                          milestones: !prev.milestones,
+                        }))
+                      }
+                      className="w-full flex items-center justify-between p-4"
+                      style={{ backgroundColor: "var(--card-bg)" }}
+                    >
+                      <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-400">
+                        Tactical Milestones
+                      </h3>
+                      {collapsedSections.milestones ? (
+                        <ChevronDown size={14} />
+                      ) : (
+                        <ChevronUp size={14} />
                       )}
-                    </React.Fragment>
-                  ))}
+                    </button>
+                    {!collapsedSections.milestones && analytics && (
+                      <div className="p-5 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
+                          <p className="text-[8px] font-black text-emerald-400 uppercase mb-1">
+                            Peak Operation
+                          </p>
+                          <p
+                            className="text-xl font-black italic font-mono"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            ${analytics.bestDay?.revenue.toFixed(2) || "0.00"}
+                          </p>
+                        </div>
+                        <div className="p-4 bg-red-500/5 rounded-xl border border-red-500/10">
+                          <p className="text-[8px] font-black text-red-400 uppercase mb-1">
+                            Lowest Sector
+                          </p>
+                          <p className="text-xl font-black italic text-red-400 font-mono">
+                            ${analytics.worstDay?.revenue.toFixed(2) || "0.00"}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Slot Performance Analysis */}
+                  {Object.keys(history).length >= 3 && (
+                    <div className="glass-card rounded-2xl overflow-hidden">
+                      <button
+                        onClick={() =>
+                          setCollapsedSections((prev) => ({
+                            ...prev,
+                            performance: !prev.performance,
+                          }))
+                        }
+                        className="w-full flex items-center justify-between p-4"
+                        style={{ backgroundColor: "var(--card-bg)" }}
+                      >
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-400">
+                          Slot Performance
+                        </h3>
+                        {collapsedSections.performance ? (
+                          <ChevronDown size={14} />
+                        ) : (
+                          <ChevronUp size={14} />
+                        )}
+                      </button>
+                      {!collapsedSections.performance && (
+                        <div className="p-5 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                          {calculateSlotPerformance()
+                            .slice(0, 5)
+                            .map((slot) => (
+                              <div
+                                key={slot.slot}
+                                className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <span className="text-lg">{slot.emoji}</span>
+                                  <span className="text-[10px] font-black">
+                                    Slot {slot.slot}
+                                  </span>
+                                </div>
+                                <span className="text-sm font-black text-emerald-400 font-mono">
+                                  {slot.hitRate}%
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Intraday Timeline remains at bottom for history context */}
+                {checkpoints.length > 0 && (
+                  <div className="glass-card rounded-3xl p-6 border-white/5">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-4">
+                      Intraday Timeline
+                    </h3>
+                    <div className="space-y-2">
+                      {checkpoints.map((cp, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-4 rounded-xl border"
+                          style={{
+                            backgroundColor: "var(--card-bg)",
+                            borderColor: "var(--card-border)",
+                          }}
+                        >
+                          <div
+                            className="text-[10px] font-black uppercase"
+                            style={{ color: "var(--text-dim)" }}
+                          >
+                            Slot {cp.slot} •{" "}
+                            {new Date(cp.time).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </div>
+                          <div className="text-lg font-black text-cyan-400 font-mono">
+                            ${cp.revenue.toFixed(2)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Inline Editing Interface */}
+                {editingRecord && (
+                  <div className="glass-card rounded-[2.5rem] p-8 border-cyan-500/30 shadow-[0_0_50px_rgba(6,182,212,0.1)] animate-in fade-in zoom-in-95 duration-300">
+                    <div className="flex items-center justify-between mb-8">
+                      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-cyan-400">
+                        Edit Tactical Record: {editingRecord.date}
+                      </h3>
+                      <button
+                        onClick={() => setEditingRecord(null)}
+                        className="p-2 text-white/20 hover:text-white transition-colors bg-white/5 rounded-lg"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="space-y-8">
+                      <div className="grid grid-cols-2 gap-6">
+                        <div className="group">
+                          <label
+                            className="block text-[10px] font-black uppercase tracking-widest mb-3 group-hover:text-cyan-400 transition-colors"
+                            style={{ color: "var(--text-dim)" }}
+                          >
+                            Revenue ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editingRecord.revenue}
+                            onChange={(e) =>
+                              setEditingRecord({
+                                ...editingRecord,
+                                revenue: e.target.value,
+                              })
+                            }
+                            className="w-full rounded-2xl px-6 py-4 text-base font-black focus:ring-2 focus:ring-cyan-500/50 transition-all italic"
+                            style={{
+                              backgroundColor: "var(--card-bg)",
+                              border: "1px solid var(--card-border)",
+                              color: "var(--text-primary)",
+                            }}
+                          />
+                        </div>
+                        <div className="group">
+                          <label
+                            className="block text-[10px] font-black uppercase tracking-widest mb-3 group-hover:text-cyan-400 transition-colors"
+                            style={{ color: "var(--text-dim)" }}
+                          >
+                            Goal ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editingRecord.goal}
+                            onChange={(e) =>
+                              setEditingRecord({
+                                ...editingRecord,
+                                goal: e.target.value,
+                              })
+                            }
+                            className="w-full rounded-2xl px-6 py-4 text-base font-black focus:ring-2 focus:ring-cyan-500/50 transition-all italic"
+                            style={{
+                              backgroundColor: "var(--card-bg)",
+                              border: "1px solid var(--card-border)",
+                              color: "var(--text-primary)",
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-4">
+                        <button
+                          onClick={() =>
+                            handleSaveHistory(
+                              editingRecord.date,
+                              editingRecord.revenue,
+                              editingRecord.goal
+                            )
+                          }
+                          className="flex-1 bg-cyan-500 text-[#020617] py-4 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        >
+                          Commit Record
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleDeleteHistory(editingRecord.date)
+                          }
+                          className="px-8 bg-red-500/10 text-red-400 py-4 rounded-2xl text-xs font-black uppercase tracking-widest border border-red-500/10 hover:bg-red-500/20 transition-all"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* History Details */}
+                <div className="space-y-4">
+                  <h3
+                    className="text-xs font-black uppercase tracking-[0.3em] px-1"
+                    style={{ color: "var(--text-dim)" }}
+                  >
+                    Mission Log Archive
+                  </h3>
+                  {Object.entries(history)
+                    .sort((a, b) => b[0].localeCompare(a[0]))
+                    .slice(0, 7)
+                    .map(([date, stats]) => (
+                      <React.Fragment key={date}>
+                        <button
+                          onClick={() =>
+                            setEditingRecord({
+                              date,
+                              revenue: stats.revenue,
+                              goal: stats.goal,
+                            })
+                          }
+                          className="w-full glass-card p-6 rounded-[2rem] flex items-center justify-between transition-all text-left group"
+                        >
+                          <div className="space-y-1">
+                            <p
+                              className="text-[11px] font-black uppercase tracking-widest"
+                              style={{ color: "var(--text-dim)" }}
+                            >
+                              {new Date(date).toLocaleDateString()}
+                            </p>
+                            <p className="text-2xl font-black italic text-cyan-400 font-mono tracking-tighter">
+                              ${(stats.revenue || 0).toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="text-right space-y-2">
+                            <span
+                              className={`text-[10px] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full ${
+                                stats.revenue >= (stats.goal || dailyGoal)
+                                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/20"
+                                  : "bg-red-500/10 text-red-400 border border-red-500/10"
+                              }`}
+                            >
+                              {stats.revenue >= (stats.goal || dailyGoal)
+                                ? "SUCCESS"
+                                : "DEVIATION"}
+                            </span>
+                            {stats.logs && stats.logs.length > 0 && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedArchiveDate(
+                                    selectedArchiveDate === date ? null : date
+                                  );
+                                }}
+                                className="text-[9px] font-black uppercase tracking-widest text-cyan-400 hover:underline"
+                              >
+                                {selectedArchiveDate === date
+                                  ? "Hide Logs"
+                                  : `View Logs (${stats.logs.length})`}
+                              </button>
+                            )}
+                            <p
+                              className="text-[10px] font-black uppercase tracking-tighter"
+                              style={{ color: "var(--text-dim)" }}
+                            >
+                              TARGET VECTOR: ${stats.goal || dailyGoal}
+                            </p>
+                          </div>
+                        </button>
+                        {/* Expandable Sync Log Archive */}
+                        {selectedArchiveDate === date && stats.logs && (
+                          <div className="mt-3 p-4 glass-card rounded-2xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="text-[10px] font-black uppercase tracking-widest text-cyan-400">
+                                Sync Log Archive
+                              </h4>
+                              <span
+                                className="text-[9px] font-bold italic"
+                                style={{ color: "var(--text-dim)" }}
+                              >
+                                {stats.logs.length} Checkpoints
+                              </span>
+                            </div>
+                            <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                              {stats.logs.map((log, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`flex items-center justify-between p-3 rounded-xl transition-all ${
+                                    log.isClosing
+                                      ? "bg-emerald-500/10 border border-emerald-500/20"
+                                      : "bg-[var(--card-bg)] border border-[var(--card-border)]"
+                                  }`}
+                                >
+                                  <div className="space-y-0.5">
+                                    <p
+                                      className="text-[10px] font-bold"
+                                      style={{ color: "var(--text-dim)" }}
+                                    >
+                                      {new Date(log.time).toLocaleTimeString(
+                                        [],
+                                        {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        }
+                                      )}
+                                      <span className="ml-2 text-cyan-500">
+                                        Slot {log.slot}
+                                      </span>
+                                      {log.isClosing && (
+                                        <span className="ml-2 text-emerald-400 font-black">
+                                          📋 RECONCILED
+                                        </span>
+                                      )}
+                                    </p>
+                                    <p
+                                      className="text-base font-black italic font-mono"
+                                      style={{ color: "var(--text-primary)" }}
+                                    >
+                                      ${(log.revenue || 0).toFixed(2)}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p
+                                      className={`text-sm font-black italic ${
+                                        (log.delta || 0) >= 0
+                                          ? "text-emerald-400"
+                                          : "text-red-400"
+                                      }`}
+                                    >
+                                      {(log.delta || 0) >= 0 ? "+" : ""}$
+                                      {(log.delta || 0).toFixed(2)}
+                                    </p>
+                                    <p
+                                      className="text-[9px] font-bold"
+                                      style={{ color: "var(--text-dim)" }}
+                                    >
+                                      Proj: ${(log.projected || 0).toFixed(2)}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            {/* HISTORICAL INTRADAY GRAPH */}
+                            <div className="pt-2 border-t border-[var(--card-border)]">
+                              <p className="text-[8px] font-black uppercase tracking-widest mb-3 opacity-50 text-center">
+                                Intraday Momentum Visualizer
+                              </p>
+                              <div className="flex justify-center">
+                                <MiniLineChart
+                                  data={(stats.logs || []).map((l) => ({
+                                    value: l.revenue || 0,
+                                    label: `S${l.slot}`,
+                                  }))}
+                                  width={240}
+                                  height={60}
+                                  color="#10b981"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </React.Fragment>
+                    ))}
+                </div>
               </div>
-            </div>
+            </ErrorBoundary>
           )}
         </main>
 
