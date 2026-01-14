@@ -519,23 +519,39 @@ function MiniPieChart({ data, size = 120 }) {
     return {
       ...d,
       path: `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`,
+      pct: ((d.value / total) * 100).toFixed(0),
     };
   });
 
   return (
-    <svg width={size} height={size}>
-      {slices.map((slice, i) => (
-        <path
-          key={i}
-          d={slice.path}
-          fill={slice.color}
-          stroke="rgba(0,0,0,0.2)"
-          strokeWidth="1"
-          className="transition-all hover:opacity-80"
-        />
-      ))}
-      <circle cx={cx} cy={cy} r={radius * 0.5} fill="var(--card-bg)" />
-    </svg>
+    <div className="flex items-center gap-6">
+      <svg width={size} height={size}>
+        {slices.map((slice, i) => (
+          <path
+            key={i}
+            d={slice.path}
+            fill={slice.color}
+            stroke="rgba(0,0,0,0.2)"
+            strokeWidth="1"
+            className="transition-all hover:opacity-80"
+          />
+        ))}
+        <circle cx={cx} cy={cy} r={radius * 0.5} fill="var(--card-bg)" />
+      </svg>
+      <div className="space-y-2">
+        {slices.map((slice, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <div
+              className="w-2.5 h-2.5 rounded-full"
+              style={{ backgroundColor: slice.color }}
+            />
+            <span className="text-[10px] font-black italic text-slate-300 uppercase tracking-tighter">
+              {slice.label}: {slice.pct}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -550,14 +566,16 @@ function WeeklyBarChart({ data, width = 280, height = 80 }) {
       </div>
     );
   const maxVal = Math.max(...data.map((d) => d.value), 1);
-  const barWidth = (width - 10) / data.length - 4;
+  const barGap = 6;
+  const availableWidth = width - 20;
+  const barWidth = availableWidth / data.length - barGap;
 
   return (
-    <svg width={width} height={height}>
+    <svg width={width} height={height} className="overflow-visible">
       {data.map((d, i) => {
-        const barHeight = (d.value / maxVal) * (height - 20);
-        const x = i * ((width - 10) / data.length) + 5;
-        const y = height - 15 - barHeight;
+        const barHeight = (d.value / maxVal) * (height - 35);
+        const x = i * (availableWidth / data.length) + 10;
+        const y = height - 20 - barHeight;
         return (
           <g key={i}>
             <rect
@@ -565,27 +583,30 @@ function WeeklyBarChart({ data, width = 280, height = 80 }) {
               y={y}
               width={barWidth}
               height={barHeight}
-              rx="3"
+              rx="4"
               fill={d.success ? "#10b981" : "#ef4444"}
               className="opacity-80 hover:opacity-100 transition-opacity"
-            />
+            >
+              <title>{`$${d.value}`}</title>
+            </rect>
             <text
               x={x + barWidth / 2}
-              y={y - 5}
-              fontSize="9"
-              fill={d.success ? "#10b981" : "#ef4444"}
+              y={y - 6}
+              fontSize="10"
+              fill={d.success ? "#10b981" : "#f87171"}
               textAnchor="middle"
-              fontWeight="bold"
+              fontWeight="black"
+              className="italic"
             >
-              ${d.value}
+              ${d.value.toFixed(0)}
             </text>
             <text
               x={x + barWidth / 2}
-              y={height - 2}
+              y={height - 4}
               fontSize="10"
               fill="#94a3b8"
               textAnchor="middle"
-              fontWeight="bold"
+              fontWeight="black"
             >
               {d.label}
             </text>
@@ -841,18 +862,40 @@ function Dashboard() {
   }, [checkpoints]);
 
   const sectorDistributionData = useMemo(() => {
-    const redTotal = SCHEDULE.filter((s) => s.priority === "RED").length;
-    const blueTotal = SCHEDULE.filter((s) => s.priority === "BLUE").length;
-    const greenTotal = SCHEDULE.filter((s) => s.priority === "GREEN").length;
-    const yellowTotal = SCHEDULE.filter((s) => s.priority === "YELLOW").length;
+    const sectorEarnings = { RED: 0, BLUE: 0, GREEN: 0, YELLOW: 0 };
+
+    // Use current session data
+    checkpoints.forEach((cp) => {
+      const slotInfo = SCHEDULE[cp.slot - 1];
+      if (slotInfo) {
+        sectorEarnings[slotInfo.priority] += cp.delta || 0;
+      }
+    });
+
+    // If no current session data, use history average to show something useful
+    const entries = Object.values(history);
+    if (checkpoints.length === 0 && entries.length > 0) {
+      entries.forEach((day) => {
+        if (day.logs) {
+          day.logs.forEach((log) => {
+            const slotInfo = SCHEDULE[log.slot - 1];
+            if (slotInfo) {
+              sectorEarnings[slotInfo.priority] += log.delta || 0;
+            }
+          });
+        }
+      });
+    }
+
+    const total = Object.values(sectorEarnings).reduce((a, b) => a + b, 0);
 
     return [
-      { label: "RED", value: redTotal, color: "#ef4444" },
-      { label: "BLUE", value: blueTotal, color: "#06b6d4" },
-      { label: "GREEN", value: greenTotal, color: "#10b981" },
-      { label: "YELLOW", value: yellowTotal, color: "#f59e0b" },
+      { label: "RED", value: sectorEarnings.RED, color: "#ef4444" },
+      { label: "BLUE", value: sectorEarnings.BLUE, color: "#06b6d4" },
+      { label: "GREEN", value: sectorEarnings.GREEN, color: "#10b981" },
+      { label: "YELLOW", value: sectorEarnings.YELLOW, color: "#f59e0b" },
     ].filter((d) => d.value > 0);
-  }, []);
+  }, [checkpoints, history]);
 
   const weeklyChartData = useMemo(() => {
     if (!history || typeof history !== "object") return [];
@@ -2585,14 +2628,14 @@ function Dashboard() {
                   </div>
 
                   {/* SECTOR DOMINANCE (PIE CHART) */}
-                  <div className="glass-card rounded-3xl p-5 flex flex-col items-center justify-center relative overflow-hidden">
+                  <div className="glass-card rounded-3xl p-5 flex flex-col items-center justify-center relative overflow-hidden min-h-[160px]">
                     <div className="absolute top-0 left-0 p-2 opacity-10">
                       <PieChart size={48} className="text-emerald-400" />
                     </div>
-                    <h3 className="text-[9px] font-black uppercase tracking-widest mb-3 text-emerald-400 relative z-10">
-                      Sector Dominance
+                    <h3 className="text-[9px] font-black uppercase tracking-widest mb-4 text-emerald-400 relative z-10 w-full text-left ml-4">
+                      Earnings Distribution
                     </h3>
-                    <div className="relative z-10">
+                    <div className="relative z-10 w-full flex justify-center">
                       <MiniPieChart data={sectorDistributionData} size={100} />
                     </div>
                   </div>
