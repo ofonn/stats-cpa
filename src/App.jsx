@@ -23,6 +23,7 @@ import {
   ChevronUp,
   PieChart,
   Activity,
+  BarChart2,
 } from "lucide-react";
 
 // --- CONFIGURATION & CONSTANTS ---
@@ -585,9 +586,8 @@ function WeeklyBarChart({ data, width = 280, height = 80 }) {
   );
 }
 
-// --- APP COMPONENT ---
-
-export default function App() {
+// --- MAIN DASHBOARD COMPONENT ---
+function Dashboard() {
   const [revenueSoFar, setRevenueSoFar] = useState(0);
   const [draftRevenue, setDraftRevenue] = useState(""); // NEW: Transactional input state
   const [dailyGoal, setDailyGoal] = useState(35);
@@ -3429,5 +3429,14 @@ export default function App() {
         )}
       </div>
     </div>
+  );
+}
+
+// --- ROOT APP COMPONENT (ERROR BOUNDARY SHELL) ---
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <Dashboard />
+    </ErrorBoundary>
   );
 }
