@@ -519,6 +519,35 @@ export default function App() {
     };
   }, [slotsCompleted, revenueSoFar, totalPossibleWeight, dailyGoal]);
 
+  const analyticsEngine = useMemo(() => {
+    if (checkpoints.length < 2)
+      return { velocity: 0, yield: 100, drift: 0, logs: [] };
+
+    // 1. VELOCITY ($/hr)
+    const latest = checkpoints[checkpoints.length - 1];
+    const prev = checkpoints[checkpoints.length - 2];
+    const deltaRev = (latest.revenue || 0) - (prev.revenue || 0);
+    const deltaTimeHrs =
+      (new Date(latest.time) - new Date(prev.time)) / 3600000;
+    const velocity = deltaTimeHrs > 0 ? deltaRev / deltaTimeHrs : 0;
+
+    // 2. YIELD ALIGNMENT
+    // Compare actual revenue per weight vs average
+    const completedArr = SCHEDULE.slice(0, slotsCompleted);
+    const weightCompleted = completedArr.reduce((acc, s) => acc + s.weight, 0);
+    const actualPerWeight =
+      weightCompleted > 0 ? revenueSoFar / weightCompleted : 0;
+    // Base expectation is roughly $2/weight (assuming $35 goal / ~18 weight total)
+    const baselinePerWeight = dailyGoal / totalPossibleWeight;
+    const yieldAlignment =
+      baselinePerWeight > 0 ? (actualPerWeight / baselinePerWeight) * 100 : 100;
+
+    // 3. DRIFT LOGS
+    const logs = [...checkpoints].reverse();
+
+    return { velocity, yield: yieldAlignment, logs };
+  }, [checkpoints, revenueSoFar, slotsCompleted, dailyGoal]);
+
   // Effects
   useEffect(() => {
     const timer = setInterval(() => {
@@ -603,10 +632,13 @@ export default function App() {
   useEffect(() => {
     if (revenueSoFar > 0 && revenueSoFar !== lastRevenue) {
       setCheckpoints((prev) => {
+        const delta = revenueSoFar - lastRevenue;
         const newCheckpoint = {
           slot: slotsCompleted,
           time: new Date().toISOString(),
           revenue: revenueSoFar,
+          delta: delta > 0 ? delta : 0,
+          projected: metrics.weighted, // Snapshot of the projection at this moment
         };
 
         // DEDUPLICATION: Keep only latest checkpoint per slot
@@ -755,14 +787,14 @@ export default function App() {
   const handleRevenueSave = () => {
     if (savingRevenue) return;
 
-    const amountToAdd = parseFloat(draftRevenue);
-    if (isNaN(amountToAdd) || amountToAdd === 0) return; // Ignore empty saves
+    const dashboardTotal = parseFloat(draftRevenue);
+    if (isNaN(dashboardTotal)) return;
 
     setSavingRevenue(true);
 
-    // Additive Logic: New Total = Old Total + New Entry
-    const newTotal = revenueSoFar + amountToAdd;
-    setRevenueSoFar(newTotal);
+    // Cumulative Logic: Current Total = Total from Dashboard
+    const oldTotal = revenueSoFar;
+    setRevenueSoFar(dashboardTotal);
     setLastUpdated(new Date());
     setDraftRevenue(""); // Clear input
 
@@ -1353,15 +1385,15 @@ export default function App() {
                   className="text-[10px] font-black uppercase tracking-[0.3em] mb-4"
                   style={{ color: "var(--text-dim)" }}
                 >
-                  CPA Sector Revenue
+                  CPAGrip Total Sync
                 </h3>
 
                 <div className="relative inline-block mb-4">
                   <span
-                    className="absolute -left-5 top-1 text-xl font-black italic"
+                    className="absolute -left-6 top-1 text-xl font-black italic"
                     style={{ color: "var(--text-dim)", opacity: 0.4 }}
                   >
-                    +
+                    $
                   </span>
                   <input
                     ref={revenueInputRef}
@@ -1411,7 +1443,7 @@ export default function App() {
                 <button
                   onClick={handleRevenueSave}
                   disabled={savingRevenue}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-cyan-500 text-[#020617] py-3.5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-600 to-cyan-400 text-[#020617] py-3.5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-[0_0_20px_rgba(6,182,212,0.2)]"
                 >
                   {savingRevenue ? (
                     <>
@@ -1426,7 +1458,7 @@ export default function App() {
                         size={16}
                         className="group-hover:rotate-12 transition-transform"
                       />
-                      <span>Log Revenue</span>
+                      <span>Sync Dashboard</span>
                     </>
                   )}
                 </button>
@@ -1895,6 +1927,195 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {view === "analytics" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+              {/* TOP ANALYTICS HIGHLIGHTS */}
+              <div className="glass-card rounded-[2.5rem] p-8 relative overflow-hidden">
+                <div
+                  className="absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 blur-2xl opacity-20"
+                  style={{ backgroundColor: "var(--text-dim)" }}
+                />
+
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 flex items-center justify-center ring-1 ring-cyan-500/30">
+                    <Activity size={24} className="text-cyan-400" />
+                  </div>
+                  <div>
+                    <h2
+                      className="text-lg font-black uppercase italic tracking-tighter"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      Performance Engine
+                    </h2>
+                    <p
+                      className="text-[10px] font-black uppercase tracking-widest"
+                      style={{ color: "var(--text-dim)" }}
+                    >
+                      Live Yield & Delta Analysis
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div
+                    className="glass-card rounded-3xl p-6 text-left relative overflow-hidden border-none"
+                    style={{ backgroundColor: "var(--bg-primary)" }}
+                  >
+                    <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]" />
+                    <p className="text-[9px] font-black uppercase tracking-widest text-cyan-400 mb-2">
+                      Real-time Velocity
+                    </p>
+                    <div className="flex items-baseline gap-1">
+                      <p
+                        className="text-2xl font-black italic font-mono"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        ${analyticsEngine.velocity.toFixed(2)}
+                      </p>
+                      <span className="text-[10px] font-black uppercase opacity-40">
+                        /hr
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    className="glass-card rounded-3xl p-6 text-left relative overflow-hidden border-none"
+                    style={{ backgroundColor: "var(--bg-primary)" }}
+                  >
+                    <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                    <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-2">
+                      Yield Efficiency
+                    </p>
+                    <div className="flex items-baseline gap-1">
+                      <p
+                        className="text-2xl font-black italic font-mono"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {analyticsEngine.yield.toFixed(1)}
+                      </p>
+                      <span className="text-[10px] font-black uppercase opacity-40">
+                        %
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="p-4 rounded-2xl flex items-center justify-between"
+                  style={{
+                    backgroundColor: "var(--card-bg)",
+                    border: "1px solid var(--card-border)",
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <TrendingUp size={14} className="text-cyan-400" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">
+                      Growth Trace
+                    </span>
+                  </div>
+                  <span className="text-xs font-black italic text-cyan-400">
+                    +
+                    {checkpoints.length > 0
+                      ? (revenueSoFar - (checkpoints[0]?.revenue || 0)).toFixed(
+                          2
+                        )
+                      : "0.00"}{" "}
+                    today
+                  </span>
+                </div>
+              </div>
+
+              {/* GROWTH LOGS (THE NEW LOG VIEW) */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-2">
+                  <h3
+                    className="text-[10px] font-black uppercase tracking-widest"
+                    style={{ color: "var(--text-dim)" }}
+                  >
+                    Sync Log History
+                  </h3>
+                  <span
+                    className="text-[10px] font-bold"
+                    style={{ color: "var(--text-dim)" }}
+                  >
+                    {analyticsEngine.logs.length} syncs
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {analyticsEngine.logs.length > 0 ? (
+                    analyticsEngine.logs.map((log, i) => (
+                      <div
+                        key={i}
+                        className="glass-card rounded-3xl p-5 flex items-center justify-between group hover:scale-[1.01] transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-inner"
+                            style={{ backgroundColor: "var(--bg-primary)" }}
+                          >
+                            {SCHEDULE[log.slot - 1]?.emoji || "⚙️"}
+                          </div>
+                          <div>
+                            <p
+                              className="text-[10px] font-black uppercase tracking-widest mb-0.5"
+                              style={{ color: "var(--text-dim)" }}
+                            >
+                              Sector {log.slot} •{" "}
+                              {new Date(log.time).toLocaleTimeString([], {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                            <p
+                              className="text-sm font-black italic tracking-tighter"
+                              style={{ color: "var(--text-primary)" }}
+                            >
+                              Sync Balance: ${log.revenue.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right flex flex-col items-end gap-1">
+                          <div className="flex flex-col items-end">
+                            <span className="text-xs font-black text-emerald-400 font-mono italic leading-none">
+                              +{log.delta.toFixed(2)}
+                            </span>
+                            <p className="text-[7px] font-black uppercase opacity-40">
+                              DELTA
+                            </p>
+                          </div>
+
+                          {log.projected && (
+                            <div
+                              className="flex flex-col items-end pt-1 border-t"
+                              style={{ borderTopColor: "var(--card-border)" }}
+                            >
+                              <span className="text-[9px] font-black text-cyan-400/70 font-mono leading-none">
+                                ${log.projected.toFixed(2)}
+                              </span>
+                              <p className="text-[6px] font-black uppercase opacity-30 tracking-tighter">
+                                PROJ @ SYNC
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div
+                      className="glass-card rounded-3xl p-12 text-center opacity-40"
+                      style={{ borderStyle: "dashed" }}
+                    >
+                      <p className="text-xs font-black uppercase tracking-widest">
+                        Waiting for Sync Data
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -2405,20 +2626,20 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => setView("history")}
+            onClick={() => setView("analytics")}
             className={`flex flex-col items-center gap-1 px-4 py-2 rounded-full transition-all duration-500 flex-1 ${
-              view === "history"
-                ? "bg-emerald-500/20 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.1)]"
+              view === "analytics"
+                ? "bg-cyan-500/20 text-cyan-400 shadow-[0_0_20px_rgba(6,185,129,0.1)]"
                 : "hover:text-cyan-400"
             }`}
-            style={{ color: view === "history" ? "" : "var(--text-dim)" }}
+            style={{ color: view === "analytics" ? "" : "var(--text-dim)" }}
           >
-            <History
+            <PieChart
               size={16}
-              className={view === "history" ? "animate-pulse" : ""}
+              className={view === "analytics" ? "animate-pulse" : ""}
             />
             <span className="text-[9px] font-black uppercase tracking-widest">
-              Logs
+              Analytics
             </span>
           </button>
 
